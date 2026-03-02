@@ -179,6 +179,9 @@
         }
       }
     },
+    "AI Suggested" : {
+
+    },
     "All" : {
       "localizations" : {
         "zh-Hans" : {
@@ -723,6 +726,9 @@
           }
         }
       }
+    },
+    "Did you mean:" : {
+
     },
     "Display Name" : {
       "localizations" : {

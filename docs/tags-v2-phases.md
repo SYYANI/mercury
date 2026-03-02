@@ -1,6 +1,6 @@
 # Tags System v2 Development Phases (Checklist)
 
-> Date: 2026-03-01 (revised 2026-03-02, 2026-03-02)
+> Date: 2026-03-01 (revised 2026-03-02)
 > Status: Planning
 > Purpose: Staged execution plan & testable checklist for V2 Tags System
 
@@ -60,7 +60,7 @@ This document breaks down the `tags-v2.md` and `tags-v2-tech-contracts.md` into 
   - The `excluding` set is the union of: IDs of tags already applied to the current article + IDs of tags shown in the AI Suggested section.
   - This query is called lazily when the tagging panel opens; results are held as `@State` in the panel view and are not continuously observed.
   - Define a `TaggingPolicy` type (enum or struct) with constants: `maxAIRecommendations = 3`, `maxPopularTagSuggestions = 10`.
-  - **`normalizedName` generation rule (must be applied consistently in every write and read path):** trim → lowercase → replace any run of `-`, `_`, `.`, or whitespace with a single space. Example: `AI-generated` → `ai generated`; `Intel_CPU` → `intel cpu`. This rule lives in a single static utility so all callers stay in sync.
+  - **`normalizedName` generation rule (implemented):** `TagNormalization.normalize(_:)` in `Core/Tags/TagNormalization.swift` — trim → lowercase → replace any run of `-`, `_`, `.`, or whitespace with a single space. Marked `nonisolated` to be callable from any isolation context. `EntryStore.normalizedTagPairs` has been updated to use it.
   - Manual UI Test: After assigning tags to several articles, open the tagging panel on a new article and confirm the "From existing tags" section lists tags sorted by frequency of use, the correct names display, and the separator normalization collapses variants correctly.
 
 ---
@@ -72,15 +72,15 @@ This document breaks down the `tags-v2.md` and `tags-v2-tech-contracts.md` into 
   - Intercept raw FeedKit `<category>` entries during sync.
   - Map them automatically via `EntryStore.assignTags(..., source: "rss")`.
   - Validation: Feed sync populates raw tags automatically.
-- [ ] **3.2 macOS `NLTagger` On-Demand Service**
-  - `actor LocalTaggingService` already created. `extractEntities(from:)` uses `NLTagger` (.organizationName, .personalName, .placeName) and returns deduplicated strings.
-  - **Trigger contract (critical):** `LocalTaggingService` is called only when the tagging panel opens for an article, not silently in the background when the article is loaded. Results are ephemeral `[String]` in-memory; nothing is written to the database unless the user taps a suggestion chip to apply it.
-  - The existing `runLocalTagging(for:)` call inside `ReaderDetailView.task(id:)` must be removed. NLTagger must not silently write `source: "nlp"` tags without user confirmation. Wire the call into the tagging panel's `onAppear` / panel-open event instead.
-  - **Post-extraction quality filters** (applied inside `extractEntities` before returning results):
-    - Drop entities containing characters other than letters, digits, spaces, or hyphens (catches fragments like `AMD didn't`).
-    - Drop entities exceeding 4 words or 25 characters.
-    - Drop entities whose `normalizedName` is a superset (longer form containing) of another entity in the same result set; keep the shorter canonical form (handles `Intel` vs `Intel CPUs` — `intel cpus` contains `intel`, so `Intel CPUs` is dropped). Note: this only catches strict supersets; semantically distinct compound names (`Apple Watch`) are unaffected.
-  - Tests: `LocalTaggingServiceTests` (4 tests already written). Add tests for: (a) fragment entities are filtered out, (b) superset deduplication drops the longer form, (c) calling `extractEntities` does not produce any database side-effects (pure extraction contract).
+- [x] **3.2 macOS `NLTagger` On-Demand Service**
+  - `actor LocalTaggingService` in `Feed/UseCases/LocalTaggingService.swift`. `extractEntities(from:)` uses `NLTagger` (.organizationName, .personalName, .placeName) and returns quality-filtered, deduplicated strings.
+  - **Trigger contract (implemented):** `LocalTaggingService` is called only when the tagging panel opens. The old `runLocalTagging(for:)` DB-writing call has been removed from `ReaderDetailView.task(id:)` and replaced with `loadNLPSuggestions(for:)` which populates `@State var nlpSuggestions: [String]` in-memory only. Wired via `onChange(of: isTagPanelPresented)` in `ReaderDetailView`. Suggestions are cleared when the panel closes or the entry changes.
+  - **Post-extraction quality filters (implemented)** in `LocalTaggingService.applyQualityFilters(to:)` (nonisolated static, testable directly):
+    - Character filter: drops entities containing characters other than letters, digits, spaces, or hyphens.
+    - Length filter: drops entities exceeding 4 words or 25 characters.
+    - Superset dedup: drops entities whose `normalizedName` has another entity's `normalizedName` as a strict word-prefix (e.g., `Intel CPUs` dropped when `Intel` is also present).
+  - **"AI Suggested" panel section (implemented):** renders up to 3 chips between the input field and the "From existing tags" section. Tapping a chip calls `addSuggestedTag(_:)` which writes `source: "manual"` and removes the chip from the suggestions list. "From existing tags" excludes tags already shown in AI Suggested.
+  - **Tests:** `LocalTaggingServiceTests` — 4 original tests + 3 new: character filter, superset dedup, side-effect-free contract.
 - [ ] **3.3 Local Recommendation Engine (Co-occurrence)**
   - Write the SQL hook `EntryStore.fetchRelatedEntries(for entryId: Int64, limit: Int)`.
   - Build the "You might also like" UI component at the bottom of the Reader view.

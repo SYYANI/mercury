@@ -604,7 +604,7 @@ final class EntryStore: ObservableObject {
         for name in names {
             let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
             guard trimmed.isEmpty == false else { continue }
-            let normalized = trimmed.lowercased()
+            let normalized = TagNormalization.normalize(trimmed)
             guard normalized.isEmpty == false else { continue }
             guard seenNormalizedNames.contains(normalized) == false else { continue }
 

@@ -58,9 +58,11 @@ struct ReaderDetailView: View {
 
     @State private var entryTags: [Tag] = []
     @State private var availableTags: [Tag] = []
+    @State private var searchableTags: [Tag] = []  // all tags including provisional; used for prefix search and fuzzy hints
     @State private var isTagPanelPresented = false
     @State private var tagInputText = ""
     @State private var isTagEditorLoading = false
+    @State private var nlpSuggestions: [String] = []
     @State private var relatedEntries: [EntryListItem] = []
 
     // MARK: - Body
@@ -91,6 +93,8 @@ struct ReaderDetailView: View {
                 setReaderHTML(nil)
                 tagInputText = ""
                 isTagPanelPresented = false
+                nlpSuggestions = []
+                searchableTags = []
                 isTranslationRunningForCurrentEntry = false
                 hasResumableTranslationCheckpointForCurrentSlot = false
                 relatedEntries = []
@@ -103,6 +107,16 @@ struct ReaderDetailView: View {
 
     private var bodyWithTagPanel: some View {
         AnyView(bodyWithLifecycle)
+            .onChange(of: isTagPanelPresented) { _, isPresented in
+                if isPresented {
+                    guard let entry = selectedEntry else { return }
+                    Task { await loadNLPSuggestions(for: entry) }
+                    Task { await loadSearchableTags() }
+                } else {
+                    nlpSuggestions = []
+                    searchableTags = []
+                }
+            }
     }
 
     // MARK: - Entry Shell
@@ -624,6 +638,8 @@ struct ReaderDetailView: View {
                 .disabled(tagInputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
 
+            nlpSuggestionsSection
+
             existingTagSuggestions
 
             if entryTags.isEmpty {
@@ -673,9 +689,52 @@ struct ReaderDetailView: View {
     }
 
     @ViewBuilder
+    private var nlpSuggestionsSection: some View {
+        let appliedNormed = Set(entryTags.map { $0.normalizedName })
+        let candidates = nlpSuggestions
+            .filter { appliedNormed.contains(TagNormalization.normalize($0)) == false }
+            .prefix(3)  // TaggingPolicy.maxAIRecommendations = 3
+
+        if candidates.isEmpty == false {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("AI Suggested", bundle: bundle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(Array(candidates), id: \.self) { name in
+                            Button {
+                                Task { await addSuggestedTag(name) }
+                            } label: {
+                                Text(name)
+                                    .font(.caption)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Capsule().fill(Color.accentColor.opacity(0.1)))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.vertical, 1)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
     private var existingTagSuggestions: some View {
         let normalizedCurrentTags = Set(entryTags.map { $0.normalizedName })
-        let candidates = availableTags.filter { normalizedCurrentTags.contains($0.normalizedName) == false }
+        let normalizedNLPSuggestions = Set(nlpSuggestions.prefix(3).map { TagNormalization.normalize($0) })
+        let excluded = normalizedCurrentTags.union(normalizedNLPSuggestions)
+        let inputPrefix = TagNormalization.normalize(tagInputText)
+        // When the user is typing, search all tags including provisional so recently-created
+        // or batch-assigned tags are discoverable. When idle, show popular non-provisional only.
+        let pool = inputPrefix.isEmpty ? availableTags : searchableTags
+        let candidates = pool.filter {
+            excluded.contains($0.normalizedName) == false &&
+            (inputPrefix.isEmpty || $0.normalizedName.hasPrefix(inputPrefix))
+        }
 
         if candidates.isEmpty == false {
             VStack(alignment: .leading, spacing: 6) {
@@ -703,7 +762,62 @@ struct ReaderDetailView: View {
                     .padding(.vertical, 1)
                 }
             }
+        } else if inputPrefix.isEmpty == false,
+                  let hint = Self.closestTag(in: searchableTags, excluding: excluded, to: inputPrefix) {
+            // No prefix match found, but a close spelling variant exists in the tag library.
+            // Show a nudge so the user can correct the typo without being forced to.
+            HStack(spacing: 4) {
+                Text("Did you mean:", bundle: bundle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Button {
+                    tagInputText = hint.name
+                } label: {
+                    Text(hint.name)
+                        .font(.caption)
+                        .underline()
+                        .foregroundStyle(Color.accentColor)
+                }
+                .buttonStyle(.plain)
+            }
         }
+    }
+
+    // MARK: - Tag Search Helpers
+
+    /// Returns the tag whose `normalizedName` is closest (Levenshtein distance ≤ 2) to
+    /// `input`, skipping any name in `excluding`. Returns `nil` when input has fewer than
+    /// 3 characters (too short to produce reliable suggestions) or no candidate is close enough.
+    private static func closestTag(in tags: [Tag], excluding: Set<String>, to input: String) -> Tag? {
+        let threshold = 2
+        guard input.count >= 3 else { return nil }
+        var best: (tag: Tag, dist: Int)?
+        for tag in tags {
+            guard excluding.contains(tag.normalizedName) == false else { continue }
+            let dist = editDistance(input, tag.normalizedName)
+            guard dist > 0, dist <= threshold else { continue }
+            if best == nil || dist < best!.dist { best = (tag, dist) }
+        }
+        return best?.tag
+    }
+
+    /// Standard Levenshtein edit distance between two strings.
+    private static func editDistance(_ s: String, _ t: String) -> Int {
+        let s = Array(s), t = Array(t)
+        let m = s.count, n = t.count
+        if m == 0 { return n }
+        if n == 0 { return m }
+        var dp = Array(0...n)
+        for i in 1...m {
+            var prev = dp[0]
+            dp[0] = i
+            for j in 1...n {
+                let temp = dp[j]
+                dp[j] = s[i - 1] == t[j - 1] ? prev : min(prev, min(dp[j - 1], dp[j])) + 1
+                prev = temp
+            }
+        }
+        return dp[n]
     }
 
     // MARK: - Reader Rendering
@@ -812,19 +926,21 @@ struct ReaderDetailView: View {
         availableTags = await appModel.entryStore.fetchTags(includeProvisional: false)
     }
 
-    private func runLocalTagging(for entry: Entry) async {
-        guard let entryId = entry.id else { return }
+    private func loadSearchableTags() async {
+        searchableTags = await appModel.entryStore.fetchTags(includeProvisional: true)
+    }
+
+    /// Loads NLP-extracted entity suggestions into `nlpSuggestions` for display in the tagging
+    /// panel. This method has no database side-effects; nothing is written until the user accepts
+    /// a suggestion by tapping its chip.
+    private func loadNLPSuggestions(for entry: Entry) async {
         var text = ""
         if let title = entry.title { text += title + " " }
         if let summary = entry.summary { text += summary }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.isEmpty == false else { return }
         let entities = await appModel.localTaggingService.extractEntities(from: trimmed)
-        guard entities.isEmpty == false else { return }
-        do {
-            try await appModel.entryStore.assignTags(to: entryId, names: entities, source: "nlp")
-        } catch { return }
-        await loadEntryTags()
+        nlpSuggestions = entities
     }
 
     private func loadRelatedEntries(for entryId: Int64?) async {
@@ -843,6 +959,23 @@ struct ReaderDetailView: View {
         do {
             try await appModel.entryStore.assignTags(to: entryId, names: names, source: "manual")
             tagInputText = ""
+            await loadEntryTags()
+            await loadAvailableTags()
+            await onTagsChanged()
+        } catch {
+            topBannerMessage = ReaderBannerMessage(text: String(localized: "Tag update failed", bundle: bundle))
+        }
+    }
+
+    private func addSuggestedTag(_ name: String) async {
+        guard let entryId = selectedEntry?.id else { return }
+        isTagEditorLoading = true
+        defer { isTagEditorLoading = false }
+        do {
+            try await appModel.entryStore.assignTags(to: entryId, names: [name], source: "manual")
+            // Do not remove from nlpSuggestions here. The nlpSuggestionsSection filters out
+            // applied tags at render time, so removing the tag later will restore the chip
+            // automatically without needing to re-run NLTagger.
             await loadEntryTags()
             await loadAvailableTags()
             await onTagsChanged()

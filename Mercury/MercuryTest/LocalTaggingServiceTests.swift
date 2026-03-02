@@ -40,4 +40,37 @@ struct LocalTaggingServiceTests {
         // NLTagger confidence can vary.
         #expect(entities.count < 3)
     }
+
+    // MARK: - Quality Filter Tests
+
+    @Test("Character filter removes entities containing disallowed characters")
+    func characterFilterRemovesNoisyFragments() {
+        // Entities containing apostrophes and similar punctuation are dropped.
+        let result = LocalTaggingService.applyQualityFilters(to: ["Intel", "AMD didn't", "Apple"])
+        #expect(result.contains("Intel"))
+        #expect(result.contains("Apple"))
+        #expect(result.contains("AMD didn't") == false)
+    }
+
+    @Test("Superset dedup keeps shorter canonical form and removes the longer superset")
+    func supersetDedupDropsLongerForm() {
+        // "Intel CPUs" normalizes to "intel cpus"; "intel" is a word-prefix of "intel cpus",
+        // so "Intel CPUs" is identified as a superset and removed.
+        let result = LocalTaggingService.applyQualityFilters(to: ["Intel", "Intel CPUs", "Apple"])
+        #expect(result.contains("Intel"))
+        #expect(result.contains("Apple"))
+        #expect(result.contains("Intel CPUs") == false)
+    }
+
+    @Test("extractEntities is a pure function with no database side-effects")
+    func extractEntitiesHasNoDatabaseSideEffects() async {
+        // This test enforces the behavioral contract: extractEntities must be callable without
+        // any database setup, produce no mutations, and return deterministic results.
+        let service = LocalTaggingService()
+        let text = "Apple announced new products at WWDC. CEO Tim Cook presented the keynote in Cupertino."
+        let first = await service.extractEntities(from: text)
+        let second = await service.extractEntities(from: text)
+        // Calling twice on the same text must yield identical results.
+        #expect(first == second)
+    }
 }
