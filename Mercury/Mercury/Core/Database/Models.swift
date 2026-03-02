@@ -313,3 +313,59 @@ struct ContentHTMLCache: Codable, FetchableRecord, MutablePersistableRecord {
     var html: String
     var updatedAt: Date
 }
+
+struct Tag: Codable, FetchableRecord, MutablePersistableRecord, Identifiable, Sendable {
+    static let databaseTableName = "tag"
+
+    var id: Int64?
+    var name: String
+    var normalizedName: String
+    var isProvisional: Bool
+    var usageCount: Int
+
+    mutating func didInsert(_ inserted: InsertionSuccess) {
+        id = inserted.rowID
+    }
+}
+
+struct TagAlias: Codable, FetchableRecord, MutablePersistableRecord, Identifiable, Sendable {
+    static let databaseTableName = "tag_alias"
+
+    var id: Int64?
+    var tagId: Int64
+    var alias: String
+    var normalizedAlias: String
+
+    mutating func didInsert(_ inserted: InsertionSuccess) {
+        id = inserted.rowID
+    }
+}
+
+struct EntryTag: Codable, FetchableRecord, MutablePersistableRecord, Sendable {
+    static let databaseTableName = "entry_tag"
+
+    var entryId: Int64
+    var tagId: Int64
+    var source: String
+    var confidence: Double?
+}
+
+extension Entry {
+    static let entryTags = hasMany(EntryTag.self)
+    static let tags = hasMany(Tag.self, through: entryTags, using: EntryTag.tag)
+}
+
+extension Tag {
+    static let entryTags = hasMany(EntryTag.self)
+    static let entries = hasMany(Entry.self, through: entryTags, using: EntryTag.entry)
+    static let aliases = hasMany(TagAlias.self)
+}
+
+extension EntryTag {
+    static let entry = belongsTo(Entry.self)
+    static let tag = belongsTo(Tag.self)
+}
+
+extension TagAlias {
+    static let tag = belongsTo(Tag.self)
+}

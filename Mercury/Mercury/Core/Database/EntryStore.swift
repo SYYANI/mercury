@@ -37,6 +37,13 @@ final class EntryStore: ObservableObject {
         var starredOnly: Bool = false
         var keepEntryId: Int64?
         var searchText: String?
+        var tagIds: Set<Int64>? = nil
+        var tagMatchMode: TagMatchMode = .any
+    }
+
+    enum TagMatchMode: String, Equatable {
+        case any
+        case all
     }
 
     func loadAll(for feedId: Int64?, unreadOnly: Bool = false, keepEntryId: Int64? = nil, searchText: String? = nil) async {
@@ -103,6 +110,22 @@ final class EntryStore: ObservableObject {
                 }
                 if query.starredOnly {
                     conditions.append("entry.isStarred = 1")
+                }
+                let queryTagIds = query.tagIds?.sorted() ?? []
+                if queryTagIds.isEmpty == false {
+                    switch query.tagMatchMode {
+                    case .any:
+                        let placeholders = Array(repeating: "?", count: queryTagIds.count).joined(separator: ",")
+                        conditions.append("entry.id IN (SELECT entryId FROM entry_tag WHERE tagId IN (\(placeholders)))")
+                        for tagId in queryTagIds {
+                            arguments += [tagId]
+                        }
+                    case .all:
+                        for tagId in queryTagIds {
+                            conditions.append("entry.id IN (SELECT entryId FROM entry_tag WHERE tagId = ?)")
+                            arguments += [tagId]
+                        }
+                    }
                 }
                 if let searchPattern {
                     conditions.append("(COALESCE(entry.title, '') LIKE ? COLLATE NOCASE OR COALESCE(entry.summary, '') LIKE ? COLLATE NOCASE)")
@@ -339,6 +362,22 @@ final class EntryStore: ObservableObject {
             if query.starredOnly {
                 conditions.append("entry.isStarred = 1")
             }
+            let queryTagIds = query.tagIds?.sorted() ?? []
+            if queryTagIds.isEmpty == false {
+                switch query.tagMatchMode {
+                case .any:
+                    let placeholders = Array(repeating: "?", count: queryTagIds.count).joined(separator: ",")
+                    conditions.append("entry.id IN (SELECT entryId FROM entry_tag WHERE tagId IN (\(placeholders)))")
+                    for tagId in queryTagIds {
+                        arguments += [tagId]
+                    }
+                case .all:
+                    for tagId in queryTagIds {
+                        conditions.append("entry.id IN (SELECT entryId FROM entry_tag WHERE tagId = ?)")
+                        arguments += [tagId]
+                    }
+                }
+            }
             if let searchPattern {
                 conditions.append("(COALESCE(entry.title, '') LIKE ? COLLATE NOCASE OR COALESCE(entry.summary, '') LIKE ? COLLATE NOCASE)")
                 arguments += [searchPattern, searchPattern]
@@ -361,5 +400,72 @@ final class EntryStore: ObservableObject {
 
             return affectedFeedIds
         }
+    }
+
+    func assignTags(to entryId: Int64, names: [String], source: String) async throws {
+        let normalizedPairs = Self.normalizedTagPairs(from: names)
+        guard normalizedPairs.isEmpty == false else { return }
+
+        try await db.write { db in
+            for (normalizedName, displayName) in normalizedPairs {
+                let tagId: Int64
+                if let existingTagId = try Int64.fetchOne(
+                    db,
+                    sql: "SELECT id FROM tag WHERE normalizedName = ? LIMIT 1",
+                    arguments: [normalizedName]
+                ) {
+                    tagId = existingTagId
+                } else {
+                    var tag = Tag(
+                        id: nil,
+                        name: displayName,
+                        normalizedName: normalizedName,
+                        isProvisional: true,
+                        usageCount: 0
+                    )
+                    try tag.insert(db)
+                    guard let insertedId = tag.id else { continue }
+                    tagId = insertedId
+                }
+
+                try db.execute(
+                    sql: """
+                    INSERT INTO entry_tag (entryId, tagId, source, confidence)
+                    VALUES (?, ?, ?, NULL)
+                    ON CONFLICT(entryId, tagId) DO NOTHING
+                    """,
+                    arguments: [entryId, tagId, source]
+                )
+
+                guard db.changesCount > 0 else { continue }
+
+                try db.execute(
+                    sql: "UPDATE tag SET usageCount = usageCount + 1 WHERE id = ?",
+                    arguments: [tagId]
+                )
+                try db.execute(
+                    sql: "UPDATE tag SET isProvisional = 0 WHERE id = ? AND usageCount >= 2",
+                    arguments: [tagId]
+                )
+            }
+        }
+    }
+
+    nonisolated private static func normalizedTagPairs(from names: [String]) -> [(String, String)] {
+        var orderedPairs: [(String, String)] = []
+        var seenNormalizedNames: Set<String> = []
+
+        for name in names {
+            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard trimmed.isEmpty == false else { continue }
+            let normalized = trimmed.lowercased()
+            guard normalized.isEmpty == false else { continue }
+            guard seenNormalizedNames.contains(normalized) == false else { continue }
+
+            seenNormalizedNames.insert(normalized)
+            orderedPairs.append((normalized, trimmed))
+        }
+
+        return orderedPairs
     }
 }

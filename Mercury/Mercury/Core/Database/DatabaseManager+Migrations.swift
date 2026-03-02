@@ -407,6 +407,43 @@ extension DatabaseManager {
             """)
         }
 
+        migrator.registerMigration("createTags") { db in
+            try db.create(table: Tag.databaseTableName) { t in
+                t.autoIncrementedPrimaryKey("id")
+                t.column("name", .text).notNull()
+                t.column("normalizedName", .text).notNull()
+                t.column("isProvisional", .boolean).notNull().defaults(to: true)
+                t.column("usageCount", .integer).notNull().defaults(to: 0)
+            }
+            try db.create(index: "idx_tag_normalized_name", on: Tag.databaseTableName, columns: ["normalizedName"], unique: true)
+
+            try db.create(table: TagAlias.databaseTableName) { t in
+                t.autoIncrementedPrimaryKey("id")
+                t.column("tagId", .integer)
+                    .notNull()
+                    .indexed()
+                    .references(Tag.databaseTableName, onDelete: .cascade)
+                t.column("alias", .text).notNull()
+                t.column("normalizedAlias", .text).notNull()
+            }
+            try db.create(index: "idx_tag_alias_normalized_alias", on: TagAlias.databaseTableName, columns: ["normalizedAlias"], unique: true)
+
+            try db.create(table: EntryTag.databaseTableName) { t in
+                t.column("entryId", .integer)
+                    .notNull()
+                    .indexed()
+                    .references(Entry.databaseTableName, onDelete: .cascade)
+                t.column("tagId", .integer)
+                    .notNull()
+                    .indexed()
+                    .references(Tag.databaseTableName, onDelete: .cascade)
+                t.column("source", .text).notNull()
+                t.column("confidence", .double)
+                t.primaryKey(["entryId", "tagId"])
+            }
+            try db.create(index: "idx_entry_tag_tag_entry", on: EntryTag.databaseTableName, columns: ["tagId", "entryId"])
+        }
+
         return migrator
     }
 }

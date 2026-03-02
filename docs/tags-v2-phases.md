@@ -11,18 +11,18 @@ This document breaks down the `tags-v2.md` and `tags-v2-tech-contracts.md` into 
 ## Phase 1: Data Layer & Core Mechanics (The Foundation)
 **Goal:** Establish the database schema, models, and core pure-local tag operations. No UI changes or AI in this phase.
 
-- [ ] **1.1 Database Migration**
+- [x] **1.1 Database Migration**
   - Add SQLite schema definitions for `tag`, `tag_alias`, and `entry_tag` in `DatabaseManager+Migrations.swift`.
   - Compile-check: App launches cleanly, database migrates successfully without crashing.
-- [ ] **1.2 Swift GRDB Models**
+- [x] **1.2 Swift GRDB Models**
   - Define `Tag`, `TagAlias`, and `EntryTag` structs in `Models.swift`.
   - Establish `hasMany(through:)` and `belongsTo()` relationships.
   - Write `TagsDatabaseTests`: Verify you can insert a Tag, assign it to an Entry, and query `Entry.tags`.
-- [ ] **1.3 Transaction Core Logic**
+- [x] **1.3 Transaction Core Logic**
   - Implement `EntryStore.assignTags(to:names:source:)` using atomic `db.write`.
   - Implement `isProvisional` logic (auto-flip `isProvisional = false` if `usageCount >= 2`).
   - Write `TagAssignmentTests`: Verify synonym deduplication (`normalizedName`) and count accumulation.
-- [ ] **1.4 Query Integration (`EntryListQuery`)**
+- [x] **1.4 Query Integration (`EntryListQuery`)**
   - Add `tagIds` and `tagMatchMode` directly to `EntryStore.EntryListQuery`.
   - Write `TagQueryTests`: Verify `.any` and `.all` mode SQL builder fetches the correct entries without breaking feed/unread scopes.
 
