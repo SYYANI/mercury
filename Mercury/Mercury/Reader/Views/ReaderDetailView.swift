@@ -30,6 +30,7 @@ struct ReaderDetailView: View {
     let loadReaderHTML: (Entry, EffectiveReaderTheme) async -> ReaderBuildResult
     let onTagsChanged: () async -> Void
     let onOpenDebugIssues: (() -> Void)?
+    let onSelectEntry: ((Int64) -> Void)?
 
     // MARK: - Reader State
 
@@ -60,6 +61,7 @@ struct ReaderDetailView: View {
     @State private var isTagPanelPresented = false
     @State private var tagInputText = ""
     @State private var isTagEditorLoading = false
+    @State private var relatedEntries: [EntryListItem] = []
 
     // MARK: - Body
 
@@ -91,6 +93,7 @@ struct ReaderDetailView: View {
                 isTagPanelPresented = false
                 isTranslationRunningForCurrentEntry = false
                 hasResumableTranslationCheckpointForCurrentSlot = false
+                relatedEntries = []
             }
             .onChange(of: effectiveReaderTheme) { _, _ in
                 sourceReaderHTML = nil
@@ -190,6 +193,8 @@ struct ReaderDetailView: View {
         .task(id: entry.id) {
             await loadEntryTags()
             await loadAvailableTags()
+            await runLocalTagging(for: entry)
+            await loadRelatedEntries(for: entry.id)
         }
     }
 
@@ -705,31 +710,40 @@ struct ReaderDetailView: View {
     // MARK: - Reader Rendering
 
     private func readerContent(baseURL: URL, webViewIdentity: String) -> some View {
-        ZStack {
-            Group {
-                if let readerHTML {
-                    WebView(
-                        html: readerHTML,
-                        baseURL: baseURL,
-                        onActionURL: { url in
-                            handleReaderActionURL(url)
-                        }
-                    )
-                        .id(webViewIdentity)
-                } else {
-                    readerPlaceholder
+        VStack(spacing: 0) {
+            ZStack {
+                Group {
+                    if let readerHTML {
+                        WebView(
+                            html: readerHTML,
+                            baseURL: baseURL,
+                            onActionURL: { url in
+                                handleReaderActionURL(url)
+                            }
+                        )
+                            .id(webViewIdentity)
+                    } else {
+                        readerPlaceholder
+                    }
+                }
+
+                if isLoadingReader {
+                    ProgressView(String(localized: "Loading…", bundle: bundle))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(nsColor: .textBackgroundColor))
 
-            if isLoadingReader {
-                ProgressView(String(localized: "Loading…", bundle: bundle))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            if relatedEntries.isEmpty == false {
+                ReaderRelatedEntriesView(entries: relatedEntries) { entryId in
+                    onSelectEntry?(entryId)
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .textBackgroundColor))
     }
 
     // MARK: - Translation Toolbar Helpers
@@ -797,6 +811,26 @@ struct ReaderDetailView: View {
 
     private func loadAvailableTags() async {
         availableTags = await appModel.entryStore.fetchTags(includeProvisional: false)
+    }
+
+    private func runLocalTagging(for entry: Entry) async {
+        guard let entryId = entry.id else { return }
+        var text = ""
+        if let title = entry.title { text += title + " " }
+        if let summary = entry.summary { text += summary }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.isEmpty == false else { return }
+        let entities = await appModel.localTaggingService.extractEntities(from: trimmed)
+        guard entities.isEmpty == false else { return }
+        do {
+            try await appModel.entryStore.assignTags(to: entryId, names: entities, source: "nlp")
+        } catch { return }
+        await loadEntryTags()
+    }
+
+    private func loadRelatedEntries(for entryId: Int64?) async {
+        guard let entryId else { relatedEntries = []; return }
+        relatedEntries = await appModel.entryStore.fetchRelatedEntries(for: entryId)
     }
 
     private func addTagsFromInput() async {

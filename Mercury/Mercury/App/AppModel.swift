@@ -17,6 +17,7 @@ final class AppModel: ObservableObject {
     let feedStore: FeedStore
     let entryStore: EntryStore
     let sidebarCountStore: SidebarCountStore
+    let localTaggingService: LocalTaggingService
     let contentStore: ContentStore
     let taskCenter: TaskCenter
     let agentRuntimeEngine: AgentRuntimeEngine
@@ -62,6 +63,7 @@ final class AppModel: ObservableObject {
         feedStore = FeedStore(db: database)
         entryStore = EntryStore(db: database)
         sidebarCountStore = SidebarCountStore(database: database)
+        localTaggingService = LocalTaggingService()
         contentStore = ContentStore(db: database)
         taskQueue = TaskQueue(
             maxConcurrentTasks: 5,
@@ -77,7 +79,7 @@ final class AppModel: ObservableObject {
                 ]
             )
         )
-        syncService = SyncService(db: database, jobRunner: jobRunner)
+        syncService = SyncService(db: database, jobRunner: jobRunner, entryStore: entryStore)
         let feedInputValidator = FeedInputValidator(database: database)
         feedCRUDUseCase = FeedCRUDUseCase(
             database: database,

@@ -444,7 +444,8 @@ struct ContentView: View {
                     selectFirst: false
                 )
             },
-            onOpenDebugIssues: openDebugIssuesAction
+            onOpenDebugIssues: openDebugIssuesAction,
+            onSelectEntry: { selectedEntryId = $0 }
         )
     }
 

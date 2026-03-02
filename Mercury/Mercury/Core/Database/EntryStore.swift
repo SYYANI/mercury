@@ -557,6 +557,46 @@ final class EntryStore: ObservableObject {
         }
     }
 
+    // MARK: - Related Entries
+
+    /// Returns entries that share the most tags with the given entry, ranked by co-occurrence count.
+    func fetchRelatedEntries(for entryId: Int64, limit: Int = 5) async -> [EntryListItem] {
+        do {
+            return try await db.read { db in
+                let sql = """
+                SELECT entry.id, entry.feedId, entry.title, entry.publishedAt,
+                       entry.createdAt, entry.isRead, entry.isStarred,
+                       COALESCE(NULLIF(TRIM(feed.title), ''), feed.feedURL) AS feedSourceTitle,
+                       COUNT(et.tagId) AS matchScore
+                FROM entry
+                JOIN entry_tag et ON entry.id = et.entryId
+                JOIN feed ON feed.id = entry.feedId
+                WHERE et.tagId IN (SELECT tagId FROM entry_tag WHERE entryId = ?)
+                  AND entry.id != ?
+                GROUP BY entry.id
+                ORDER BY matchScore DESC, entry.publishedAt DESC
+                LIMIT ?
+                """
+                let rows = try Row.fetchAll(db, sql: sql, arguments: [entryId, entryId, limit])
+                return rows.compactMap { row -> EntryListItem? in
+                    guard let id: Int64 = row["id"] else { return nil }
+                    return EntryListItem(
+                        id: id,
+                        feedId: row["feedId"] ?? 0,
+                        title: row["title"],
+                        publishedAt: row["publishedAt"],
+                        createdAt: row["createdAt"] ?? Date(),
+                        isRead: row["isRead"] ?? false,
+                        isStarred: row["isStarred"] ?? false,
+                        feedSourceTitle: row["feedSourceTitle"]
+                    )
+                }
+            }
+        } catch {
+            return []
+        }
+    }
+
     nonisolated private static func normalizedTagPairs(from names: [String]) -> [(String, String)] {
         var orderedPairs: [(String, String)] = []
         var seenNormalizedNames: Set<String> = []
