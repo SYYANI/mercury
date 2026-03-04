@@ -19,6 +19,7 @@ struct SummaryRunRequest: Sendable {
 
 enum SummaryRunEvent: Sendable {
     case started(UUID)
+    case notice(String)
     case token(String)
     case terminal(TaskTerminalOutcome)
 }
@@ -73,6 +74,8 @@ extension AppModel {
 
             let startedAt = Date()
             do {
+                let template = try await loadPromptTemplate(config: .summary) { await onEvent(.notice($0)) }
+
                 let success = try await runSummaryExecution(
                     request: SummaryRunRequest(
                         entryId: request.entryId,
@@ -80,6 +83,7 @@ extension AppModel {
                         targetLanguage: targetLanguage,
                         detailLevel: request.detailLevel
                     ),
+                    template: template,
                     defaults: summaryDefaults,
                     database: database,
                     credentialStore: credentialStore,
@@ -181,6 +185,7 @@ extension AppModel {
 
 private func runSummaryExecution(
     request: SummaryRunRequest,
+    template: AgentPromptTemplate,
     defaults: SummaryAgentDefaults,
     database: DatabaseManager,
     credentialStore: CredentialStore,
@@ -197,7 +202,6 @@ private func runSummaryExecution(
         throw SummaryExecutionError.targetLanguageRequired
     }
 
-    let template = try SummaryPromptCustomization.loadSummaryTemplate()
     let renderParameters = [
         "targetLanguage": targetLanguage,
         "targetLanguageDisplayName": AgentExecutionShared.languageDisplayName(for: targetLanguage),

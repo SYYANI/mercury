@@ -74,7 +74,7 @@ extension AgentSettingsView {
             }
 
             settingsRow("Prompts") {
-                customPromptsButton { try appModel.revealSummaryCustomPromptInFinder() }
+                customPromptsButton { try appModel.revealCustomPromptInFinder(config: .summary) }
             }
         }
 
@@ -131,7 +131,7 @@ extension AgentSettingsView {
             }
 
             settingsRow("Prompts") {
-                customPromptsButton { try appModel.revealTranslationCustomPromptInFinder() }
+                customPromptsButton { try appModel.revealCustomPromptInFinder(config: .translation) }
             }
         }
     }
@@ -148,7 +148,7 @@ extension AgentSettingsView {
             }
 
             settingsRow("Prompts") {
-                customPromptsButton { try appModel.revealTaggingCustomPromptInFinder() }
+                customPromptsButton { try appModel.revealCustomPromptInFinder(config: .tagging) }
             }
         }
     }

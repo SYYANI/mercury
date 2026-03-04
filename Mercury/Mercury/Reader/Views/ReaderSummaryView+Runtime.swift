@@ -372,6 +372,11 @@ extension ReaderSummaryView {
                     activePhase: .generating
                 )
             }
+        case .notice(let message):
+            topBannerMessage = ReaderBannerMessage(
+                text: message,
+                secondaryAction: .openDebugIssues
+            )
         case .token(let token):
             summaryActivePhase = .generating
             if let runningOwner {

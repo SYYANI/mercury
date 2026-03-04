@@ -214,6 +214,13 @@ struct ReaderTaggingPanelView: View {
             switch event {
             case .started:
                 break
+            case .notice(let message):
+                await MainActor.run {
+                    topBannerMessage = ReaderBannerMessage(
+                        text: message,
+                        secondaryAction: .openDebugIssues
+                    )
+                }
             case .completed(let tagNames):
                 await MainActor.run {
                     // Merge: AI results first, then any NLP entities not already covered.

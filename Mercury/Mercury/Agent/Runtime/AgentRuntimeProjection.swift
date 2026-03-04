@@ -63,13 +63,6 @@ nonisolated enum AgentRuntimeProjection {
         )
     }
 
-    @MainActor static func translationInvalidCustomPromptFallbackStatus() -> String {
-        String(
-            localized: "Custom translation prompt is invalid. Using built-in prompt.",
-            bundle: LanguageManager.shared.bundle
-        )
-    }
-
     @MainActor static func translationWaitingStatus() -> String {
         phaseDisplayStrings().waiting
     }

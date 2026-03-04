@@ -15,6 +15,7 @@ struct TaggingPanelRequest: Sendable {
 
 enum TaggingPanelEvent: Sendable {
     case started(UUID)
+    case notice(String)
     // Resolved tag names (existing canonical names or normalized new proposals).
     case completed([String])
     case terminal(TaskTerminalOutcome)
@@ -69,8 +70,11 @@ extension AppModel {
 
             let startedAt = Date()
             do {
+                let template = try await loadPromptTemplate(config: .tagging) { await onEvent(.notice($0)) }
+
                 let success = try await runTaggingPanelExecution(
                     request: request,
+                    template: template,
                     defaults: taggingDefaults,
                     database: database,
                     credentialStore: credentialStore,
@@ -119,7 +123,7 @@ extension AppModel {
                         taskType: .tagging,
                         taskKind: .tagging,
                         targetLanguage: "",
-                        templateId: TaggingPromptCustomization.templateID,
+                        templateId: AgentPromptCustomizationConfig.tagging.templateID,
                         templateVersion: "v1",
                         runtimeSnapshotBase: ["taskId": resolvedTaskID.uuidString],
                         failedDebugTitle: "Tagging Failed",
@@ -140,7 +144,7 @@ extension AppModel {
                         taskType: .tagging,
                         taskKind: .tagging,
                         targetLanguage: "",
-                        templateId: TaggingPromptCustomization.templateID,
+                        templateId: AgentPromptCustomizationConfig.tagging.templateID,
                         templateVersion: "v1",
                         runtimeSnapshotBase: ["taskId": resolvedTaskID.uuidString],
                         failedDebugTitle: "Tagging Failed",
@@ -170,13 +174,12 @@ extension AppModel {
 
 private func runTaggingPanelExecution(
     request: TaggingPanelRequest,
+    template: AgentPromptTemplate,
     defaults: TaggingAgentDefaults,
     database: DatabaseManager,
     credentialStore: CredentialStore,
     cancellationReasonProvider: @escaping AppTaskTerminationReasonProvider
 ) async throws -> TaggingExecutionSuccess {
-    let template = try TaggingPromptCustomization.loadTaggingTemplate()
-
     // Fetch top vocabulary tags for prompt injection (non-provisional, ordered by usage).
     let vocabularyTags = try await database.read { db in
         try Tag

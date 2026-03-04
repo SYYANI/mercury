@@ -187,35 +187,13 @@ extension AppModel {
                 request.sourceSnapshot.segments.map { ($0.sourceSegmentId, $0) },
                 uniquingKeysWith: { first, _ in first }
             )
-            var loadedTemplateId = TranslationPromptCustomization.templateID
+            var loadedTemplateId = AgentPromptCustomizationConfig.translation.templateID
             var loadedTemplateVersion = "unknown"
             var checkpointTaskRunIdForFailureHandling: Int64?
             do {
-                var invalidCustomTemplateDetail: String?
-                let template = try TranslationPromptCustomization.loadTranslationTemplate(
-                    onInvalidCustomTemplate: { customURL, error in
-                        invalidCustomTemplateDetail = [
-                            "path=\(customURL.path)",
-                            "error=\(error.localizedDescription)",
-                            "action=fallback_to_built_in_template"
-                        ].joined(separator: "\n")
-                    }
-                )
+                let template = try await loadPromptTemplate(config: .translation) { await onEvent(.notice($0)) }
                 loadedTemplateId = template.id
                 loadedTemplateVersion = template.version
-                if let invalidCustomTemplateDetail {
-                    let fallbackMessage = await MainActor.run {
-                        AgentRuntimeProjection.translationInvalidCustomPromptFallbackStatus()
-                    }
-                    await MainActor.run {
-                        self.reportDebugIssue(
-                            title: "Translation Prompt Customization Invalid",
-                            detail: invalidCustomTemplateDetail,
-                            category: .task
-                        )
-                    }
-                    await onEvent(.notice(fallbackMessage))
-                }
 
                 checkpointTaskRunIdForFailureHandling = await self.startTranslationCheckpointRunSafely(
                     entryId: request.entryId,

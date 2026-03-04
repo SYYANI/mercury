@@ -570,7 +570,30 @@
         }
       }
     },
+    "Custom summary prompt is invalid. Using built-in prompt." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自定义摘要提示词无效，已改用内置提示词。"
+          }
+        }
+      }
+    },
+    "Custom tagging prompt is invalid. Using built-in prompt." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自定义标签提示词无效，已改用内置提示词。"
+          }
+        }
+      }
+    },
     "Custom translation prompt is invalid. Using built-in prompt." : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
