@@ -177,6 +177,36 @@ This document breaks down the `tags-v2.md` and `tags-v2-tech-contracts.md` into 
   - Add a unit test for the JSON parse fallback path: malformed LLM response → empty array, no crash.
   - Manual UI test: open tagging panel with LLM configured → loading indicator appears → suggestions replace NLTagger results → close panel before response → no crash, no dangling task.
 
+- [ ] **4-S7 (Panel UI Refactor): Unified Suggestion Chip Container with Wrapping**
+  - Introduce one shared suggestion container for both **"AI Suggested"** and **"From existing tags"** sections in `ReaderTaggingPanelView`.
+  - Keep each section's business logic unchanged:
+    - **AI Suggested source contract:** show local NLP suggestions first; when tagging-agent results arrive, merge by placing LLM results first and keeping NLP-only remainder.
+    - **From existing tags source contract:** keep existing exclusion/filter/ranking logic (exclude applied + AI-shown tags; idle uses non-provisional popular tags, typing uses searchable tags with prefix match).
+  - Replace horizontal-only chip rows with wrapped multi-line chip layout (no horizontal overflow dependency).
+  - Keep visual style and interactions unchanged (same chip style, same tap-to-assign behavior, same loading indicator semantics).
+  - Add a UI smoke test checklist for long chip labels and high chip counts to verify wrapping behavior in both sections.
+
+- [ ] **4-S8 (Contract Alignment): Strict Agent Availability Across Summary/Translation/Tagging**
+  - Unify availability definition for all three agents under one explicit contract:
+    1. If `primaryModelId` is missing, agent is unavailable.
+    2. If primary model exists but its provider is disabled/archived (or model disabled/archived), agent is unavailable.
+    3. If task-specific required settings are missing, agent is unavailable.
+    4. Otherwise, agent is available.
+  - Remove all implicit fallback behavior for availability and route execution that auto-selects default/newest/other models without explicit user choice.
+  - Keep the existing exception only for provider-deletion migration behavior (model reassignment during provider deletion flow).
+  - Update General Settings gating to rely on strict availability:
+    - `Enable AI Tagging` toggle disabled when tagging availability is false.
+    - Explanatory caption shown when unavailable.
+    - `Batch Tagging...` disabled when availability is false or toggle is off.
+  - Add regression tests covering disabled-provider primary model, missing-primary-model, and task-specific-required-setting-missing scenarios for all three agent types.
+
+- [ ] **4-S9 (Localization Completion): Tagging-Related Strings and Missing Usage Paths**
+  - Execute after 4-S7 and 4-S8 are merged.
+  - Fill missing `zh-Hans` translations for existing tagging-related keys in `Localizable.xcstrings`.
+  - Add missing keys for any tagging UI strings currently hardcoded or not captured by localization resources.
+  - Verify the affected screens end-to-end in Chinese: Reader tagging panel (`AI Suggested`, `From existing tags`, input hint/error text), General > Tag System, and Tag management entry points.
+  - Keep debug/internal diagnostics out of localization scope per project localization policy.
+
 ---
 
 ## Phase 5: Power User Tools & Polish (The Batch Queue)
