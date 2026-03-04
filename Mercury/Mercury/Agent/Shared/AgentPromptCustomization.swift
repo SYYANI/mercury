@@ -15,6 +15,8 @@ struct AgentPromptCustomizationConfig {
     let invalidTemplateDebugTitle: String
     /// Localization key for the reader banner shown when falling back to the built-in template.
     let invalidTemplateFallbackMessageKey: String
+    /// Localization key for the agent name inserted into `invalidTemplateFallbackMessageKey`.
+    let invalidTemplateFallbackAgentNameKey: String
 
     static let builtInTemplateExtension = "yaml"
     static let templatesSubdirectory = "Agent/Prompts"
@@ -26,7 +28,8 @@ struct AgentPromptCustomizationConfig {
         builtInTemplateName: "summary.default",
         templateID: "summary.default",
         invalidTemplateDebugTitle: "Summary Prompt Customization Invalid",
-        invalidTemplateFallbackMessageKey: "Custom summary prompt is invalid. Using built-in prompt."
+        invalidTemplateFallbackMessageKey: "Custom %@ prompt is invalid. Using built-in prompt.",
+        invalidTemplateFallbackAgentNameKey: "Summary"
     )
 
     static let translation = AgentPromptCustomizationConfig(
@@ -34,7 +37,8 @@ struct AgentPromptCustomizationConfig {
         builtInTemplateName: "translation.default",
         templateID: "translation.default",
         invalidTemplateDebugTitle: "Translation Prompt Customization Invalid",
-        invalidTemplateFallbackMessageKey: "Custom translation prompt is invalid. Using built-in prompt."
+        invalidTemplateFallbackMessageKey: "Custom %@ prompt is invalid. Using built-in prompt.",
+        invalidTemplateFallbackAgentNameKey: "Translation"
     )
 
     static let tagging = AgentPromptCustomizationConfig(
@@ -42,7 +46,8 @@ struct AgentPromptCustomizationConfig {
         builtInTemplateName: "tagging.default",
         templateID: "tagging.default",
         invalidTemplateDebugTitle: "Tagging Prompt Customization Invalid",
-        invalidTemplateFallbackMessageKey: "Custom tagging prompt is invalid. Using built-in prompt."
+        invalidTemplateFallbackMessageKey: "Custom %@ prompt is invalid. Using built-in prompt.",
+        invalidTemplateFallbackAgentNameKey: "Tagging"
     )
 }
 
@@ -241,7 +246,10 @@ extension AppModel {
         if let invalidDetail {
             let key = config.invalidTemplateFallbackMessageKey
             let message = await MainActor.run {
-                NSLocalizedString(key, bundle: LanguageManager.shared.bundle, comment: "")
+                let bundle = LanguageManager.shared.bundle
+                let format = NSLocalizedString(key, bundle: bundle, comment: "")
+                let agentName = NSLocalizedString(config.invalidTemplateFallbackAgentNameKey, bundle: bundle, comment: "")
+                return String(format: format, agentName)
             }
             await MainActor.run {
                 self.reportDebugIssue(

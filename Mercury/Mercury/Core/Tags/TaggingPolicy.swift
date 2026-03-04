@@ -5,13 +5,16 @@
 
 import Foundation
 
-/// Centralizes tagging-related policy constants and thresholds for panel (single-article) mode.
+/// Centralizes tagging-related policy constants and thresholds.
 enum TaggingPolicy {
     /// Maximum number of AI-suggested tag chips shown in the tagging panel.
     static let maxAIRecommendations = 5
 
     /// Maximum number of existing-tag prefix-match chips shown during input.
     static let maxExistingTagChips = 10
+
+    /// Maximum number of tags selectable simultaneously in sidebar tag filtering.
+    static let maxSidebarSelectedTags = 5
 
     /// Minimum `usageCount` a tag must reach before it is promoted from provisional to permanent.
     /// Governs manual + panel-accepted tags only; batch tags stay provisional until sign-off.

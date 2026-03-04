@@ -36,8 +36,6 @@ struct SidebarView<StatusView: View>: View {
     @State private var tagPendingDelete: SidebarTagItem? = nil
     @State private var isDeleteConfirmPresented: Bool = false
 
-    private let maxSelectedTags = 5
-
     init(
         feeds: [Feed],
         projection: SidebarProjection,
@@ -115,7 +113,7 @@ struct SidebarView<StatusView: View>: View {
             return String(localized: "Delete Tag?", bundle: bundle)
         }
         return String(
-            format: String(localized: "Delete \u{201C}%@\u{201D}?", bundle: bundle),
+            format: String(localized: "Delete tag \u{201C}%@\u{201D}?", bundle: bundle),
             name
         )
     }
@@ -255,7 +253,10 @@ struct SidebarView<StatusView: View>: View {
                         }
                         .buttonStyle(.plain)
                         .padding(.vertical, 2)
-                        .disabled(selectedTagIds.contains(tag.tagId) == false && selectedTagIds.count >= maxSelectedTags)
+                        .disabled(
+                            selectedTagIds.contains(tag.tagId) == false
+                                && selectedTagIds.count >= TaggingPolicy.maxSidebarSelectedTags
+                        )
                         .contextMenu {
                             Button {
                                 tagPendingRename = tag
@@ -273,7 +274,13 @@ struct SidebarView<StatusView: View>: View {
                 }
             }
 
-            Text(String(format: String(localized: "Selected: %lld / 5", bundle: bundle), selectedTagIds.count))
+            Text(
+                String(
+                    format: String(localized: "Selected: %lld / %lld", bundle: bundle),
+                    Int64(selectedTagIds.count),
+                    Int64(TaggingPolicy.maxSidebarSelectedTags)
+                )
+            )
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -322,7 +329,7 @@ struct SidebarView<StatusView: View>: View {
             selectedTagIds.remove(tagId)
             return
         }
-        guard selectedTagIds.count < maxSelectedTags else { return }
+        guard selectedTagIds.count < TaggingPolicy.maxSidebarSelectedTags else { return }
         selectedTagIds.insert(tagId)
     }
 

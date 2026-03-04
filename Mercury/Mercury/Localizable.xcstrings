@@ -77,7 +77,14 @@
       }
     },
     "Add" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加"
+          }
+        }
+      }
     },
     "Add Feed" : {
       "localizations" : {
@@ -180,7 +187,14 @@
       }
     },
     "AI Suggested" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 推荐"
+          }
+        }
+      }
     },
     "All" : {
       "localizations" : {
@@ -203,7 +217,14 @@
       }
     },
     "Any" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "任一"
+          }
+        }
+      }
     },
     "API Key" : {
       "shouldTranslate" : false
@@ -292,7 +313,14 @@
       }
     },
     "Batch Tagging..." : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "批量打标签..."
+          }
+        }
+      }
     },
     "Bootstrap failed: %@" : {
       "localizations" : {
@@ -435,7 +463,14 @@
       }
     },
     "Clear selected tags" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除已选标签"
+          }
+        }
+      }
     },
     "Clear Translation" : {
       "localizations" : {
@@ -487,8 +522,15 @@
         }
       }
     },
-    "Configure a model in Agents > Tagging to enable AI tagging." : {
-
+    "Configure a model in Agents > Agents > Tagging to enable AI tagging." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请在 设置 > Agents > Tagging 中配置模型以启用 AI 打标签。"
+          }
+        }
+      }
     },
     "Content Width" : {
       "localizations" : {
@@ -560,45 +602,23 @@
         }
       }
     },
+    "Custom %@ prompt is invalid. Using built-in prompt." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自定义%@提示词无效，已改用内置提示词。"
+          }
+        }
+      }
+    },
     "custom prompts" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "自定义提示词"
-          }
-        }
-      }
-    },
-    "Custom summary prompt is invalid. Using built-in prompt." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "自定义摘要提示词无效，已改用内置提示词。"
-          }
-        }
-      }
-    },
-    "Custom tagging prompt is invalid. Using built-in prompt." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "自定义标签提示词无效，已改用内置提示词。"
-          }
-        }
-      }
-    },
-    "Custom translation prompt is invalid. Using built-in prompt." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "自定义翻译提示词无效，已改用内置提示词。"
           }
         }
       }
@@ -642,9 +662,6 @@
           }
         }
       }
-    },
-    "Delete “%@”?" : {
-
     },
     "Delete \"%@\"? This also removes all associated entries." : {
       "localizations" : {
@@ -726,8 +743,25 @@
         }
       }
     },
+    "Delete tag “%@”?" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除标签“%@”？"
+          }
+        }
+      }
+    },
     "Delete Tag?" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除标签？"
+          }
+        }
+      }
     },
     "Delete…" : {
       "localizations" : {
@@ -763,7 +797,14 @@
       }
     },
     "Did you mean:" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你是想说："
+          }
+        }
+      }
     },
     "Display Name" : {
       "localizations" : {
@@ -856,7 +897,14 @@
       }
     },
     "Enable AI Tagging" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启用 AI 打标签"
+          }
+        }
+      }
     },
     "Enable Auto-summary?" : {
       "localizations" : {
@@ -1109,7 +1157,14 @@
       }
     },
     "From existing tags" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从已有标签中选择"
+          }
+        }
+      }
     },
     "General" : {
       "localizations" : {
@@ -1122,7 +1177,14 @@
       }
     },
     "Generating suggestions..." : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在生成建议..."
+          }
+        }
+      }
     },
     "Generating..." : {
       "localizations" : {
@@ -1365,10 +1427,24 @@
       }
     },
     "Match" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "匹配"
+          }
+        }
+      }
     },
     "Match mode for selected tags" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已选标签的匹配模式"
+          }
+        }
+      }
     },
     "Max Tokens" : {
       "shouldTranslate" : false
@@ -1557,7 +1633,14 @@
       }
     },
     "No tags yet" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暂无标签"
+          }
+        }
+      }
     },
     "No translation" : {
       "localizations" : {
@@ -1903,16 +1986,44 @@
       }
     },
     "Related Content" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相关内容"
+          }
+        }
+      }
     },
     "Rename" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重命名"
+          }
+        }
+      }
     },
     "Rename Tag" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重命名标签"
+          }
+        }
+      }
     },
     "Rename…" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重命名…"
+          }
+        }
+      }
     },
     "Replace existing feeds" : {
       "localizations" : {
@@ -2118,7 +2229,14 @@
       }
     },
     "Search tags" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜索标签"
+          }
+        }
+      }
     },
     "Select an entry to read" : {
       "localizations" : {
@@ -2130,8 +2248,15 @@
         }
       }
     },
-    "Selected: %lld / 5" : {
-
+    "Selected: %lld / %lld" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已选择：%lld / %lld"
+          }
+        }
+      }
     },
     "Series" : {
       "localizations" : {
@@ -2347,16 +2472,44 @@
       "shouldTranslate" : false
     },
     "Tag Library..." : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标签库..."
+          }
+        }
+      }
     },
     "Tag name" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标签名称"
+          }
+        }
+      }
     },
     "Tag System" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标签系统"
+          }
+        }
+      }
     },
     "Tag update failed" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标签更新失败"
+          }
+        }
+      }
     },
     "Tagging" : {
       "localizations" : {
@@ -2369,7 +2522,14 @@
       }
     },
     "Tags" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标签"
+          }
+        }
+      }
     },
     "Target Language" : {
       "localizations" : {
@@ -2468,7 +2628,14 @@
       }
     },
     "This will remove the tag from all articles." : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这会从所有文章中移除该标签。"
+          }
+        }
+      }
     },
     "Token Type" : {
       "localizations" : {
@@ -2534,7 +2701,14 @@
       }
     },
     "Type tags (comma-separated)" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入标签（用逗号分隔）"
+          }
+        }
+      }
     },
     "Typography" : {
       "localizations" : {
