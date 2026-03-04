@@ -8,6 +8,8 @@ func resolveAgentRouteCandidates(
     database: DatabaseManager,
     credentialStore: CredentialStore
 ) async throws -> [AgentRouteCandidate] {
+    guard let primaryModelId else { return [] }
+
     let (models, providers) = try await database.read { db in
         let models: [AgentModelProfile]
         switch taskType {
@@ -45,14 +47,11 @@ func resolveAgentRouteCandidates(
         provider.id.map { ($0, provider) }
     })
 
-    var routeModelIDs: [Int64] = []
-    if let primaryModelId {
-        routeModelIDs.append(primaryModelId)
-    } else if let defaultModel = models.first(where: { $0.isDefault }), let defaultModelId = defaultModel.id {
-        routeModelIDs.append(defaultModelId)
-    } else if let newest = models.sorted(by: { $0.updatedAt > $1.updatedAt }).first, let modelId = newest.id {
-        routeModelIDs.append(modelId)
-    }
+    // Strict contract: primary model must be explicitly configured and valid.
+    // No implicit default/newest/any-model auto-selection.
+    guard modelsByID[primaryModelId] != nil else { return [] }
+
+    var routeModelIDs: [Int64] = [primaryModelId]
 
     if let fallbackModelId, routeModelIDs.contains(fallbackModelId) == false {
         routeModelIDs.append(fallbackModelId)
@@ -64,21 +63,6 @@ func resolveAgentRouteCandidates(
         guard let provider = providersByID[model.providerProfileId] else { continue }
         let apiKey = try credentialStore.readSecret(for: provider.apiKeyRef)
         candidates.append(AgentRouteCandidate(provider: provider, model: model, apiKey: apiKey))
-    }
-
-    if candidates.isEmpty {
-        let fallbackModel = models
-            .sorted { lhs, rhs in
-                if lhs.isDefault != rhs.isDefault {
-                    return lhs.isDefault && rhs.isDefault == false
-                }
-                return lhs.updatedAt > rhs.updatedAt
-            }
-            .first
-        if let fallbackModel, let provider = providersByID[fallbackModel.providerProfileId] {
-            let apiKey = try credentialStore.readSecret(for: provider.apiKeyRef)
-            candidates.append(AgentRouteCandidate(provider: provider, model: fallbackModel, apiKey: apiKey))
-        }
     }
 
     return candidates

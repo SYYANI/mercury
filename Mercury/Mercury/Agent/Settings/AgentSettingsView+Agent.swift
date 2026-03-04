@@ -38,7 +38,7 @@ extension AgentSettingsView {
     var summaryAgentConfigView: some View {
         propertiesCard {
             settingsRow("Primary Model") {
-                modelPicker(selection: $summaryPrimaryModelId)
+                modelPicker(selection: $summaryPrimaryModelId, allowNone: true)
             }
 
             settingsRow("Fallback Model") {
@@ -84,7 +84,7 @@ extension AgentSettingsView {
     var translationAgentConfigView: some View {
         propertiesCard {
             settingsRow("Primary Model") {
-                modelPicker(selection: $translationPrimaryModelId)
+                modelPicker(selection: $translationPrimaryModelId, allowNone: true)
             }
 
             settingsRow("Fallback Model") {
@@ -140,7 +140,7 @@ extension AgentSettingsView {
     var taggingAgentConfigView: some View {
         propertiesCard {
             settingsRow("Primary Model") {
-                modelPicker(selection: $taggingPrimaryModelId)
+                modelPicker(selection: $taggingPrimaryModelId, allowNone: true)
             }
 
             settingsRow("Fallback Model") {

@@ -109,7 +109,7 @@ private struct GeneralSettingsView: View {
                     .disabled(!appModel.isTaggingAgentAvailable)
 
                     if !appModel.isTaggingAgentAvailable {
-                        Text("Configure a model in Agents > Tagging to enable AI tagging.", bundle: bundle)
+                        Text("Configure a model in Agents > Agents > Tagging to enable AI tagging.", bundle: bundle)
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -117,7 +117,7 @@ private struct GeneralSettingsView: View {
                     Button(action: {}) {
                         Text("Batch Tagging...", bundle: bundle)
                     }
-                    .disabled(!isTaggingAgentEnabled)
+                    .disabled(!appModel.isTaggingAgentAvailable || !isTaggingAgentEnabled)
 
                     Button(action: {}) {
                         Text("Tag Library...", bundle: bundle)
@@ -133,6 +133,14 @@ private struct GeneralSettingsView: View {
         .onAppear {
             syncFeedConcurrency = appModel.syncFeedConcurrency
             usageRetentionPolicy = appModel.loadLLMUsageRetentionPolicy()
+            if appModel.isTaggingAgentAvailable == false {
+                isTaggingAgentEnabled = false
+            }
+        }
+        .onChange(of: appModel.isTaggingAgentAvailable) { _, isAvailable in
+            if isAvailable == false {
+                isTaggingAgentEnabled = false
+            }
         }
         .confirmationDialog(
             String(localized: "Clear All Usage Data", bundle: bundle),

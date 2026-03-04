@@ -303,12 +303,5 @@ extension AgentSettingsView {
         if let translationFallbackModelId, validModelIds.contains(translationFallbackModelId) == false {
             self.translationFallbackModelId = nil
         }
-
-        if self.summaryPrimaryModelId == nil {
-            self.summaryPrimaryModelId = defaultModelId
-        }
-        if self.translationPrimaryModelId == nil {
-            self.translationPrimaryModelId = defaultModelId
-        }
     }
 }

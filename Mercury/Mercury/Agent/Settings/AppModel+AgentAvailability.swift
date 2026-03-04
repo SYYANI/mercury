@@ -24,101 +24,72 @@ extension AppModel {
     // MARK: - Per-kind check
 
     /// An agent kind is available when its configured route (primaryModelId →
-    /// fallbackModelId → default model → newest model) resolves to at least
-    /// one enabled model whose provider is also enabled. This mirrors the
-    /// candidate-selection logic in `resolveAgentRouteCandidates` exactly so
+    /// fallbackModelId) has an explicitly selected primary model that resolves
+    /// to an enabled model whose provider is also enabled. This mirrors the
+    /// strict candidate-selection logic in `resolveAgentRouteCandidates` so
     /// the availability flag and the runtime always agree. Credential reads
     /// are skipped — reachability is validated at runtime via the failure/banner UX.
     private func checkAgentAvailability(for taskType: AgentTaskType) async -> Bool {
-        // Load the UserDefaults-configured model IDs — same source as resolveAgentRouteCandidates.
+        // Load UserDefaults-configured settings — same source as resolveAgentRouteCandidates.
         let primaryModelId: Int64?
-        let fallbackModelId: Int64?
+        let hasRequiredTaskSettings: Bool
         switch taskType {
         case .summary:
             let d = loadSummaryAgentDefaults()
             primaryModelId = d.primaryModelId
-            fallbackModelId = d.fallbackModelId
+            hasRequiredTaskSettings = d.targetLanguage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
         case .translation:
             let d = loadTranslationAgentDefaults()
             primaryModelId = d.primaryModelId
-            fallbackModelId = d.fallbackModelId
+            hasRequiredTaskSettings = d.targetLanguage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+                && TranslationSettingsKey.concurrencyRange.contains(d.concurrencyDegree)
         case .tagging:
             let d = loadTaggingAgentDefaults()
             primaryModelId = d.primaryModelId
-            fallbackModelId = d.fallbackModelId
+            hasRequiredTaskSettings = true
         }
+
+        guard hasRequiredTaskSettings else { return false }
+        guard let primaryModelId else { return false }
 
         do {
             return try await database.read { db in
-                // Fetch all enabled models that support this task kind — same query as resolveAgentRouteCandidates.
-                let models: [AgentModelProfile]
+                // Resolve the configured primary model strictly.
+                let primaryModel: AgentModelProfile?
                 switch taskType {
                 case .summary:
-                    models = try AgentModelProfile
+                    primaryModel = try AgentModelProfile
+                        .filter(Column("id") == primaryModelId)
                         .filter(Column("supportsSummary") == true)
                         .filter(Column("isEnabled") == true)
                         .filter(Column("isArchived") == false)
-                        .fetchAll(db)
+                        .fetchOne(db)
                 case .translation:
-                    models = try AgentModelProfile
+                    primaryModel = try AgentModelProfile
+                        .filter(Column("id") == primaryModelId)
                         .filter(Column("supportsTranslation") == true)
                         .filter(Column("isEnabled") == true)
                         .filter(Column("isArchived") == false)
-                        .fetchAll(db)
+                        .fetchOne(db)
                 case .tagging:
-                    models = try AgentModelProfile
+                    primaryModel = try AgentModelProfile
+                        .filter(Column("id") == primaryModelId)
                         .filter(Column("supportsTagging") == true)
                         .filter(Column("isEnabled") == true)
                         .filter(Column("isArchived") == false)
-                        .fetchAll(db)
+                        .fetchOne(db)
                 }
 
-                guard models.isEmpty == false else { return false }
+                guard let primaryModel else { return false }
 
-                // Fetch all enabled providers — same query as resolveAgentRouteCandidates.
-                let providers = try AgentProviderProfile
+                // Primary model's provider must also be enabled.
+                let primaryProvider = try AgentProviderProfile
+                    .filter(Column("id") == primaryModel.providerProfileId)
                     .filter(Column("isEnabled") == true)
                     .filter(Column("isArchived") == false)
-                    .fetchAll(db)
+                    .fetchOne(db)
 
-                let modelsByID = Dictionary(uniqueKeysWithValues: models.compactMap { m in
-                    m.id.map { ($0, m) }
-                })
-                let enabledProviderIDs = Set(providers.compactMap(\.id))
-
-                // Build the candidate model ID list — same priority order as resolveAgentRouteCandidates.
-                var routeModelIDs: [Int64] = []
-                if let primaryModelId {
-                    routeModelIDs.append(primaryModelId)
-                } else if let def = models.first(where: { $0.isDefault }), let defId = def.id {
-                    routeModelIDs.append(defId)
-                } else if let newest = models.sorted(by: { $0.updatedAt > $1.updatedAt }).first, let id = newest.id {
-                    routeModelIDs.append(id)
-                }
-
-                if let fallbackModelId, routeModelIDs.contains(fallbackModelId) == false {
-                    routeModelIDs.append(fallbackModelId)
-                }
-
-                // Check whether any configured candidate resolves to an enabled model+provider pair.
-                let hasConfiguredRoute = routeModelIDs.contains { modelID in
-                    guard let model = modelsByID[modelID] else { return false }
-                    return enabledProviderIDs.contains(model.providerProfileId)
-                }
-                if hasConfiguredRoute { return true }
-
-                // Last-resort fallback: any enabled model with an enabled provider — mirrors resolveAgentRouteCandidates.
-                let fallbackModel = models
-                    .sorted { lhs, rhs in
-                        if lhs.isDefault != rhs.isDefault { return lhs.isDefault }
-                        return lhs.updatedAt > rhs.updatedAt
-                    }
-                    .first
-                if let fallbackModel, enabledProviderIDs.contains(fallbackModel.providerProfileId) {
-                    return true
-                }
-
-                return false
+                return primaryProvider != nil
             }
         } catch {
             return false
