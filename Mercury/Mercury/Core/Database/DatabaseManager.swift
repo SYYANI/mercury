@@ -36,7 +36,7 @@ final class DatabaseManager {
     private static let primaryDatabaseRegistryLock = NSLock()
     private static var activePrimaryDatabasePaths: Set<String> = []
 
-    convenience init(inMemory accessMode: DatabaseAccessMode = .readWrite) throws {
+    convenience init(inMemory accessMode: DatabaseAccessMode) throws {
         try self.init(path: ":memory:", accessMode: accessMode)
     }
 

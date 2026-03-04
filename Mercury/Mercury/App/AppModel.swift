@@ -141,7 +141,9 @@ final class AppModel: ObservableObject {
     }
 
     private static func makeDefaultDatabaseManager() throws -> DatabaseManager {
-        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+        let hasXCTestConfiguration = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+
+        if hasXCTestConfiguration {
             if let sharedXCTestDatabaseManager {
                 return sharedXCTestDatabaseManager
             }
@@ -156,7 +158,7 @@ final class AppModel: ObservableObject {
         }
 
         do {
-            let manager = try DatabaseManager()
+            let manager = try DatabaseManager(path: nil, accessMode: .readWrite)
             sharedDefaultDatabaseManager = manager
             return manager
         } catch {

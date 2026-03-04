@@ -270,10 +270,23 @@ Required capability:
 
 - explicit test-friendly shutdown for background work started during initialization
 - startup task handles must be owned and cancellable or awaitable
+- a stable project-level way to detect the `XCTest` host for the default initializer
 
 Rationale:
 
 `AppModel` currently starts asynchronous work during initialization. Tests need a deterministic way to end that work before database cleanup.
+
+For Mercury, the accepted `XCTest` host check is:
+
+- `ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil`
+
+This is an accepted Mercury runtime contract because it has been validated against both normal app launch and the current `XCTest` execution path. It should not be generalized beyond this project without re-validation.
+
+The default database open path must also remain explicit. Mercury previously regressed because a zero-argument `DatabaseManager()` call was resolved to the in-memory overload through default-argument overload selection. Future changes must preserve these rules:
+
+- the normal app/runtime default database path is opened through an explicit on-disk `DatabaseManager` construction path
+- in-memory database creation uses an explicit `inMemory:` call site
+- no new ambiguous zero-argument `DatabaseManager` overloads are introduced
 
 ### 7.4 Optional but recommended: lifecycle protocol
 
@@ -390,7 +403,16 @@ A lightweight lint step or grep-based CI guard is acceptable if needed.
 
 All new database-backed tests should use the shared fixture modules. Direct filesystem lifecycle management in individual tests should be treated as a contract violation.
 
-### 10.4 Documentation is not the primary user interface
+### 10.4 Default initializer contract
+
+The default `AppModel()` initializer has two valid runtime modes only:
+
+1. normal app/runtime mode: open the persistent database at `Application Support/Mercury/mercury.sqlite`
+2. `XCTest` host mode: use the shared in-memory test database
+
+This branch must continue to be guarded by the Mercury-specific `XCTestConfigurationFilePath` check, and the on-disk branch must continue to use an explicit non-ambiguous `DatabaseManager` construction path.
+
+### 10.5 Documentation is not the primary user interface
 
 This document defines policy and architecture. It is not the intended day-to-day setup guide for routine database tests.
 

@@ -86,6 +86,8 @@ Full design: `docs/l10n.md`.
 - If a test creates a long-lived observer/store outside `AppModelTestHarness`, shut it down explicitly before fixture teardown, for example `SidebarCountStore.stopObservation()`.
 - The `AppModel()` default initializer is reserved for app/runtime code. Tests should inject a database manager or use the shared harnesses.
 - In the `XCTest` host environment, the default `AppModel()` database is an in-memory shared test database; do not write tests that rely on its persisted files or cross-process visibility.
+- In Mercury, the accepted `XCTest` host check is `ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil`. Keep this assumption local to this project unless it is re-validated elsewhere.
+- Do not use ambiguous zero-argument `DatabaseManager` construction for the app/runtime default database path. The on-disk default path must be opened explicitly, and in-memory database creation must use an explicit `inMemory:` call.
 - If a database test needs a new scenario, extend the shared fixtures/harnesses first; do not introduce one-off lifecycle patterns.
 
 Database testing design and migration notes live in `docs/db-test.md`.
