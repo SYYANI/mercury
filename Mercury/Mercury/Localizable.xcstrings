@@ -603,7 +603,6 @@
       }
     },
     "Custom %@ prompt is invalid. Using built-in prompt." : {
-      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {

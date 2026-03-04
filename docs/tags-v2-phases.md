@@ -112,7 +112,7 @@ This document breaks down the `tags-v2.md` and `tags-v2-tech-contracts.md` into 
 
 > Implementation order: 4-S1 → 4-S2 → 4-S3 → 4-S4 → 4-S5. Complete Settings UI (4-S2) early so all later work has visible entry points.
 
-- [ ] **4-S1 (Foundation): `TaggingAgentDefaults` + Availability**
+- [x] **4-S1 (Foundation): `TaggingAgentDefaults` + Availability**
   - Add `TaggingAgentDefaults` struct in `AppModel+Agent.swift` with `primaryModelId` and `fallbackModelId`. Add `loadTaggingAgentDefaults()` and `saveTaggingAgentDefaults()` backed by UserDefaults keys `Agent.Tagging.PrimaryModelId` and `Agent.Tagging.FallbackModelId`.
   - Fix `checkAgentAvailability(for: .tagging)`: remove the hardcoded `return false`; replace with the same logic as `.summary` — read UserDefaults model IDs, query `supportsTagging == true && isEnabled && !isArchived` models, verify at least one has an enabled provider.
   - Add `@Published var isTaggingAgentAvailable: Bool = false` to `AppModel`. Update `refreshAgentAvailability()` to include the tagging check.
@@ -124,7 +124,7 @@ This document breaks down the `tags-v2.md` and `tags-v2-tech-contracts.md` into 
     - Add `case .tagging: return false` and `case .taggingBatch: return false` to `FailurePolicy.shouldSurfaceFailureToUser`.
     - Add `.tagging: 15` to `TaskTimeoutPolicy.executionTimeoutByTaskKind` (no entry for `.taggingBatch` — batch has no execution-level deadline).
 
-- [ ] **4-S2 (Settings UI): Agents > Tagging + General > Tag System**
+- [x] **4-S2 (Settings UI): Agents > Tagging + General > Tag System**
   - **Agents settings page**: Add a Tagging section below Translation. Contents:
     - Primary Model picker (same component as Summary/Translation).
     - Fallback Model picker.
@@ -136,7 +136,7 @@ This document breaks down the `tags-v2.md` and `tags-v2-tech-contracts.md` into 
     - **"Tag Library..." button**: always enabled; opens the Tag Management settings page (Phase 5.2).
   - At this stage the Batch Tagging and Tag Library destinations can be placeholder stubs — the Settings navigation structure must be fully routed to enable progressive implementation.
 
-- [ ] **4-S3 (Prompt): `tagging.default.yaml`**
+- [x] **4-S3 (Prompt): `tagging.default.yaml`**
   - Create `Resources/Agent/Prompts/tagging.default.yaml`.
   - Template variables: `{{existingTagsJson}}`, `{{maxTagCount}}`, `{{maxNewTagCount}}`, `{{title}}`, `{{body}}`.
   - `{{existingTagsJson}}`: top `TaggingPolicy.maxVocabularyInjection` non-provisional tags by `usageCount DESC`, serialized as a JSON array. Empty array if no tags exist.
@@ -146,7 +146,7 @@ This document breaks down the `tags-v2.md` and `tags-v2-tech-contracts.md` into 
   - System prompt must enforce: output is a raw JSON array of strings only (no markdown, no preamble), at most `{{maxTagCount}}` items total, prefer terms from `{{existingTagsJson}}` (exact match expected), new terms must be English-only max 3 words with at most `{{maxNewTagCount}}` new terms, return `[]` if nothing fits confidently.
   - No manual registration step is required. `AgentPromptTemplateStore` auto-discovers all `.yaml`/`.yml` files placed in `Resources/Agent/Prompts/`. Placing the file with the correct `taskType: tagging` YAML field is sufficient.
 
-- [ ] **4-S4 (Execution): `AppModel+TagExecution.swift`**
+- [x] **4-S4 (Execution): `AppModel+TagExecution.swift`**
   - Create `AppModel+TagExecution.swift`. This file covers **panel mode only**. Batch execution lives in `AppModel+TagBatchExecution.swift` (Phase 5.1).
   - Implement `func startTaggingRun(for entry: Entry)` using `AgentTaskKind.tagging` / `AppTaskKind.tagging`.
   - **Panel mode scheduling policy**: `AgentRunOwner(taskKind: .tagging, entryId: entry.id, slotKey: "panel")`. Apply replace-on-reopen: if an active task for this owner exists, cancel it before enqueueing the new one. No waiting slot. This is a call-site policy, not an `AgentRunStateMachine` constraint.
@@ -162,7 +162,7 @@ This document breaks down the `tags-v2.md` and `tags-v2-tech-contracts.md` into 
   - `FailurePolicy.shouldSurfaceFailureToUser(kind: .tagging)` returns `false`. Failures fall back to NLTagger silently.
   - Also implement `func cancelTaggingRun(for entry: Entry, slotKey: String)` for panel teardown on disappear.
 
-- [ ] **4-S5 (Panel Wiring): AI Path in `ReaderTaggingPanelView`**
+- [x] **4-S5 (Panel Wiring): AI Path in `ReaderTaggingPanelView`**
   - Remove `@State private var aiTask: Task<Void, Never>?`. The panel now observes `AgentRuntimeStore` for the tagging task state of the current entry (same pattern as `ReaderSummaryView`).
   - On `.onAppear` (after NLTagger call):
     - If `appModel.isTaggingAgentAvailable && isTaggingAgentEnabled`: call `appModel.startTaggingRun(for: entry, mode: .panel)`.
@@ -171,13 +171,15 @@ This document breaks down the `tags-v2.md` and `tags-v2-tech-contracts.md` into 
   - On task `.failed` / `.cancelled`: retain NLTagger results, no error shown.
   - On `.onDisappear` or `entry` identity change: call `appModel.cancelTaggingRun(for: entry, slotKey: "panel")`.
   - The `nlpSuggestions` section label remains "AI Suggested" regardless of source (NLTagger or LLM); the distinction is invisible to the user.
+  - Status: Implemented via panel event callback flow (`startTaggingPanelRun` / `cancelTaggingPanelRun`) with equivalent user-facing behavior and silent fallback contract.
 
-- [ ] **4-S6 (Tests): `TagAliasBypassTests` + Panel Smoke Tests**
+- [x] **4-S6 (Tests): `TagAliasBypassTests` + Panel Smoke Tests**
   - `TagAliasBypassTests`: verify that simulated LLM outputs ("LLM", "Deep Learning", "ChatGPT") collapse into canonical tag IDs after normalization + alias resolver. Verify that unrecognized output names are returned as-is (new tag proposals).
   - Add a unit test for the JSON parse fallback path: malformed LLM response → empty array, no crash.
   - Manual UI test: open tagging panel with LLM configured → loading indicator appears → suggestions replace NLTagger results → close panel before response → no crash, no dangling task.
+  - Status: Added `TagAliasBypassTests` for alias-to-canonical collapse and unmatched-name proposal behavior; JSON parse fallback assertions are covered in `TaggingExecutionTests`.
 
-- [ ] **4-S7 (Panel UI Refactor): Unified Suggestion Chip Container with Wrapping**
+- [x] **4-S7 (Panel UI Refactor): Unified Suggestion Chip Container with Wrapping**
   - Introduce one shared suggestion container for both **"AI Suggested"** and **"From existing tags"** sections in `ReaderTaggingPanelView`.
   - Keep each section's business logic unchanged:
     - **AI Suggested source contract:** show local NLP suggestions first; when tagging-agent results arrive, merge by placing LLM results first and keeping NLP-only remainder.
@@ -186,7 +188,7 @@ This document breaks down the `tags-v2.md` and `tags-v2-tech-contracts.md` into 
   - Keep visual style and interactions unchanged (same chip style, same tap-to-assign behavior, same loading indicator semantics).
   - Add a UI smoke test checklist for long chip labels and high chip counts to verify wrapping behavior in both sections.
 
-- [ ] **4-S8 (Contract Alignment): Strict Agent Availability Across Summary/Translation/Tagging**
+- [x] **4-S8 (Contract Alignment): Strict Agent Availability Across Summary/Translation/Tagging**
   - Unify availability definition for all three agents under one explicit contract:
     1. If `primaryModelId` is missing, agent is unavailable.
     2. If primary model exists but its provider is disabled/archived (or model disabled/archived), agent is unavailable.
@@ -200,7 +202,7 @@ This document breaks down the `tags-v2.md` and `tags-v2-tech-contracts.md` into 
     - `Batch Tagging...` disabled when availability is false or toggle is off.
   - Add regression tests covering disabled-provider primary model, missing-primary-model, and task-specific-required-setting-missing scenarios for all three agent types.
 
-- [ ] **4-S9 (Localization Completion): Tagging-Related Strings and Missing Usage Paths**
+- [x] **4-S9 (Localization Completion): Tagging-Related Strings and Missing Usage Paths**
   - Execute after 4-S7 and 4-S8 are merged.
   - Fill missing `zh-Hans` translations for existing tagging-related keys in `Localizable.xcstrings`.
   - Add missing keys for any tagging UI strings currently hardcoded or not captured by localization resources.

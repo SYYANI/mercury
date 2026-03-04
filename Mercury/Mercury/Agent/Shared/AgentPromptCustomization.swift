@@ -13,8 +13,6 @@ struct AgentPromptCustomizationConfig {
     let templateID: String
     /// Title for the debug issue logged when the custom template is invalid.
     let invalidTemplateDebugTitle: String
-    /// Localization key for the reader banner shown when falling back to the built-in template.
-    let invalidTemplateFallbackMessageKey: String
     /// Localization key for the agent name inserted into `invalidTemplateFallbackMessageKey`.
     let invalidTemplateFallbackAgentNameKey: String
 
@@ -28,7 +26,6 @@ struct AgentPromptCustomizationConfig {
         builtInTemplateName: "summary.default",
         templateID: "summary.default",
         invalidTemplateDebugTitle: "Summary Prompt Customization Invalid",
-        invalidTemplateFallbackMessageKey: "Custom %@ prompt is invalid. Using built-in prompt.",
         invalidTemplateFallbackAgentNameKey: "Summary"
     )
 
@@ -37,7 +34,6 @@ struct AgentPromptCustomizationConfig {
         builtInTemplateName: "translation.default",
         templateID: "translation.default",
         invalidTemplateDebugTitle: "Translation Prompt Customization Invalid",
-        invalidTemplateFallbackMessageKey: "Custom %@ prompt is invalid. Using built-in prompt.",
         invalidTemplateFallbackAgentNameKey: "Translation"
     )
 
@@ -46,7 +42,6 @@ struct AgentPromptCustomizationConfig {
         builtInTemplateName: "tagging.default",
         templateID: "tagging.default",
         invalidTemplateDebugTitle: "Tagging Prompt Customization Invalid",
-        invalidTemplateFallbackMessageKey: "Custom %@ prompt is invalid. Using built-in prompt.",
         invalidTemplateFallbackAgentNameKey: "Tagging"
     )
 }
@@ -244,10 +239,13 @@ extension AppModel {
             }
         )
         if let invalidDetail {
-            let key = config.invalidTemplateFallbackMessageKey
             let message = await MainActor.run {
                 let bundle = LanguageManager.shared.bundle
-                let format = NSLocalizedString(key, bundle: bundle, comment: "")
+                let format = NSLocalizedString(
+                    "Custom %@ prompt is invalid. Using built-in prompt.",
+                    bundle: bundle,
+                    comment: ""
+                )
                 let agentName = NSLocalizedString(config.invalidTemplateFallbackAgentNameKey, bundle: bundle, comment: "")
                 return String(format: format, agentName)
             }
