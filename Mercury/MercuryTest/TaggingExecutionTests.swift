@@ -36,7 +36,7 @@ struct TaggingExecutionTests {
     }
 
     @Test("Returns empty array for empty string input")
-    func returnsEmptyForEmptyInput() {
+    func returnsEmptyForEmptyStringInput() {
         let result = parseTagsFromLLMResponse("")
         #expect(result.isEmpty)
     }
@@ -164,7 +164,7 @@ struct TaggingExecutionTests {
 
     @Test("Returns empty result for empty input array")
     @MainActor
-    func returnsEmptyForEmptyInput() async throws {
+    func returnsEmptyForEmptyInputArray() async throws {
         let dbPath = temporaryDatabasePath()
         defer { try? FileManager.default.removeItem(atPath: dbPath) }
         let db = try DatabaseManager(path: dbPath)
