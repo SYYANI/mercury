@@ -33,8 +33,8 @@ enum TaggingExecutionError: LocalizedError {
 }
 
 private struct TaggingExecutionSuccess: Sendable {
-    let providerProfileId: Int64
-    let modelProfileId: Int64
+    let providerProfileId: Int64?
+    let modelProfileId: Int64?
     let templateId: String
     let templateVersion: String
     let resolvedTagNames: [String]
@@ -180,256 +180,42 @@ private func runTaggingPanelExecution(
     credentialStore: CredentialStore,
     cancellationReasonProvider: @escaping AppTaskTerminationReasonProvider
 ) async throws -> TaggingExecutionSuccess {
-    // Fetch top vocabulary tags for prompt injection (non-provisional, ordered by usage).
-    let vocabularyTags = try await database.read { db in
-        try Tag
-            .filter(Column("isProvisional") == false)
-            .order(Column("usageCount").desc)
-            .limit(TaggingPolicy.maxVocabularyInjection)
-            .fetchAll(db)
-    }
-    let vocabularyNames = vocabularyTags.map { $0.name }
-    let vocabularyJson: String
-    if let encoded = try? JSONEncoder().encode(vocabularyNames),
-       let str = String(data: encoded, encoding: .utf8) {
-        vocabularyJson = str
-    } else {
-        vocabularyJson = "[]"
-    }
+    let profile = TaggingLLMRequestProfile(
+        templateID: template.id,
+        templateVersion: template.version,
+        maxTagCount: TaggingPolicy.maxAIRecommendations,
+        maxNewTagCount: TaggingPolicy.maxNewTagProposalsPerEntry,
+        bodyStrategy: .readabilityPrefix(800),
+        timeoutSeconds: TaskTimeoutPolicy.executionTimeout(for: AppTaskKind.tagging) ?? 60,
+        temperatureOverride: nil,
+        topPOverride: nil
+    )
 
-    let renderParameters: [String: String] = [
-        "existingTagsJson": vocabularyJson,
-        "maxTagCount": String(TaggingPolicy.maxAIRecommendations),
-        "maxNewTagCount": String(TaggingPolicy.maxNewTagProposalsPerEntry),
-        "title": request.title,
-        "body": String(request.body.prefix(800))
-    ]
-
-    let renderedSystemPrompt = try template.renderSystem(parameters: renderParameters) ?? ""
-    let renderedPrompt = try template.render(parameters: renderParameters)
-
-    let candidates = try await resolveAgentRouteCandidates(
-        taskType: .tagging,
-        primaryModelId: defaults.primaryModelId,
-        fallbackModelId: defaults.fallbackModelId,
+    let result = try await executeTaggingPerEntry(
+        entryId: request.entryId,
+        title: request.title,
+        body: request.body,
+        template: template,
+        profile: profile,
+        defaults: defaults,
+        taskKind: .tagging,
         database: database,
-        credentialStore: credentialStore
+        credentialStore: credentialStore,
+        cancellationReasonProvider: cancellationReasonProvider
     )
-    guard candidates.isEmpty == false else {
-        throw TaggingExecutionError.noUsableModelRoute
-    }
 
-    var lastError: Error?
-    for (index, candidate) in candidates.enumerated() {
-        let requestStartedAt = Date()
-        do {
-            try Task.checkCancellation()
-
-            guard let baseURL = URL(string: candidate.provider.baseURL) else {
-                throw LLMProviderError.invalidConfiguration(
-                    "Invalid provider base URL: \(candidate.provider.baseURL)"
-                )
-            }
-            guard let providerProfileId = candidate.provider.id,
-                  let modelProfileId = candidate.model.id else {
-                throw TaggingExecutionError.noUsableModelRoute
-            }
-
-            let llmRequest = LLMRequest(
-                baseURL: baseURL,
-                apiKey: candidate.apiKey,
-                model: candidate.model.modelName,
-                messages: [
-                    LLMMessage(role: "system", content: renderedSystemPrompt),
-                    LLMMessage(role: "user", content: renderedPrompt)
-                ],
-                temperature: candidate.model.temperature,
-                topP: candidate.model.topP,
-                maxTokens: candidate.model.maxTokens,
-                stream: false,
-                networkTimeoutProfile: LLMNetworkTimeoutProfile(
-                    policy: TaskTimeoutPolicy.networkTimeout(for: AgentTaskKind.tagging)
-                )
-            )
-
-            let provider = AgentLLMProvider()
-            let response = try await provider.complete(request: llmRequest)
-
-            try? await recordLLMUsageEvent(
-                database: database,
-                context: LLMUsageEventContext(
-                    taskRunId: nil,
-                    entryId: request.entryId,
-                    taskType: .tagging,
-                    providerProfileId: providerProfileId,
-                    modelProfileId: modelProfileId,
-                    providerBaseURLSnapshot: candidate.provider.baseURL,
-                    providerResolvedURLSnapshot: response.resolvedEndpoint?.url,
-                    providerResolvedHostSnapshot: response.resolvedEndpoint?.host,
-                    providerResolvedPathSnapshot: response.resolvedEndpoint?.path,
-                    providerNameSnapshot: candidate.provider.name,
-                    modelNameSnapshot: candidate.model.modelName,
-                    requestPhase: .normal,
-                    requestStatus: .succeeded,
-                    promptTokens: response.usagePromptTokens,
-                    completionTokens: response.usageCompletionTokens,
-                    startedAt: requestStartedAt,
-                    finishedAt: Date()
-                )
-            )
-
-            // Parse flat JSON array from LLM response text.
-            let rawNames = parseTagsFromLLMResponse(response.text)
-            // Resolve names through alias resolver + strict DB match.
-            let resolvedNames = try await resolveTagNamesFromDB(rawNames, database: database)
-
-            return TaggingExecutionSuccess(
-                providerProfileId: providerProfileId,
-                modelProfileId: modelProfileId,
-                templateId: template.id,
-                templateVersion: template.version,
-                resolvedTagNames: resolvedNames,
-                runtimeSnapshot: [
-                    "providerProfileId": String(providerProfileId),
-                    "modelProfileId": String(modelProfileId),
-                    "routeIndex": String(index),
-                    "rawTagCount": String(rawNames.count),
-                    "resolvedTagCount": String(resolvedNames.count)
-                ]
-            )
-        } catch {
-            if isCancellationLikeError(error) {
-                let cancellationStatus = usageStatusForCancellation(
-                    taskKind: .tagging,
-                    terminationReason: await cancellationReasonProvider()
-                )
-                try? await recordLLMUsageEvent(
-                    database: database,
-                    context: LLMUsageEventContext(
-                        taskRunId: nil,
-                        entryId: request.entryId,
-                        taskType: .tagging,
-                        providerProfileId: candidate.provider.id,
-                        modelProfileId: candidate.model.id,
-                        providerBaseURLSnapshot: candidate.provider.baseURL,
-                        providerResolvedURLSnapshot: nil,
-                        providerResolvedHostSnapshot: nil,
-                        providerResolvedPathSnapshot: nil,
-                        providerNameSnapshot: candidate.provider.name,
-                        modelNameSnapshot: candidate.model.modelName,
-                        requestPhase: .normal,
-                        requestStatus: cancellationStatus,
-                        promptTokens: nil,
-                        completionTokens: nil,
-                        startedAt: requestStartedAt,
-                        finishedAt: Date()
-                    )
-                )
-                throw CancellationError()
-            }
-
-            try? await recordLLMUsageEvent(
-                database: database,
-                context: LLMUsageEventContext(
-                    taskRunId: nil,
-                    entryId: request.entryId,
-                    taskType: .tagging,
-                    providerProfileId: candidate.provider.id,
-                    modelProfileId: candidate.model.id,
-                    providerBaseURLSnapshot: candidate.provider.baseURL,
-                    providerResolvedURLSnapshot: nil,
-                    providerResolvedHostSnapshot: nil,
-                    providerResolvedPathSnapshot: nil,
-                    providerNameSnapshot: candidate.provider.name,
-                    modelNameSnapshot: candidate.model.modelName,
-                    requestPhase: .normal,
-                    requestStatus: usageStatusForFailure(error: error, taskKind: .tagging),
-                    promptTokens: nil,
-                    completionTokens: nil,
-                    startedAt: requestStartedAt,
-                    finishedAt: Date()
-                )
-            )
-            lastError = error
-            if index < candidates.count - 1 {
-                continue
-            }
-        }
-    }
-
-    throw lastError ?? TaggingExecutionError.noUsableModelRoute
-}
-
-/// Parse a flat JSON array of strings from LLM response text, stripping markdown fences if present.
-func parseTagsFromLLMResponse(_ text: String) -> [String] {
-    let cleaned = text
-        .trimmingCharacters(in: .whitespacesAndNewlines)
-        .replacingOccurrences(of: "```json", with: "")
-        .replacingOccurrences(of: "```", with: "")
-        .trimmingCharacters(in: .whitespacesAndNewlines)
-    guard let data = cleaned.data(using: .utf8),
-          let names = try? JSONDecoder().decode([String].self, from: data) else {
-        return []
-    }
-    return names
-        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-        .filter { $0.isEmpty == false }
-}
-
-/// Resolve raw LLM-proposed tag names through the DB vocabulary.
-/// Each name is normalized, then matched via strict normalizedName lookup or alias lookup.
-/// Unmatched names are returned as normalized new proposals.
-/// Result preserves the order of first occurrence and deduplicates.
-func resolveTagNamesFromDB(
-    _ rawNames: [String],
-    database: DatabaseManager
-) async throws -> [String] {
-    let allTags = try await database.read { db in
-        try Tag.fetchAll(db)
-    }
-    let allAliases = try await database.read { db in
-        try TagAlias.fetchAll(db)
-    }
-
-    let tagByNormalized: [String: Tag] = Dictionary(
-        uniqueKeysWithValues: allTags.compactMap { tag -> (String, Tag)? in
-            guard tag.id != nil else { return nil }
-            return (tag.normalizedName, tag)
-        }
+    return TaggingExecutionSuccess(
+        providerProfileId: result.providerProfileId,
+        modelProfileId: result.modelProfileId,
+        templateId: template.id,
+        templateVersion: template.version,
+        resolvedTagNames: result.resolvedDisplayNames,
+        runtimeSnapshot: [
+            "providerProfileId": String(result.providerProfileId ?? 0),
+            "modelProfileId": String(result.modelProfileId ?? 0),
+            "rawTagCount": String(result.parsedNames.count),
+            "resolvedTagCount": String(result.resolvedDisplayNames.count),
+            "durationMs": String(result.durationMs)
+        ]
     )
-    let tagByAlias: [String: Tag] = {
-        var mapping: [String: Tag] = [:]
-        for alias in allAliases {
-            if let tag = allTags.first(where: { $0.id == alias.tagId }) {
-                mapping[alias.normalizedAlias] = tag
-            }
-        }
-        return mapping
-    }()
-
-    var result: [String] = []
-    var seen: Set<String> = []
-
-    for rawName in rawNames {
-        let normed = TagNormalization.normalize(rawName)
-        guard normed.isEmpty == false else { continue }
-        if let matchedTag = tagByNormalized[normed] {
-            // Exact DB match — use canonical display name.
-            guard seen.insert(matchedTag.name).inserted else { continue }
-            result.append(matchedTag.name)
-        } else if let aliasTag = tagByAlias[normed] {
-            // Alias resolution — use canonical display name.
-            guard seen.insert(aliasTag.name).inserted else { continue }
-            result.append(aliasTag.name)
-        } else {
-            // New proposal — title-case for display consistency (e.g. "finance" → "Finance").
-            let titleCased = normed
-                .split(separator: " ")
-                .map { $0.prefix(1).uppercased() + $0.dropFirst() }
-                .joined(separator: " ")
-            guard seen.insert(normed).inserted else { continue }
-            result.append(titleCased)
-        }
-    }
-    return result
 }

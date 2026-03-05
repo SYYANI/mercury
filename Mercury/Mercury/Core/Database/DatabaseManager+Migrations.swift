@@ -450,6 +450,115 @@ extension DatabaseManager {
             try db.execute(sql: "ALTER TABLE feed DROP COLUMN unreadCount")
         }
 
+        migrator.registerMigration("createTagBatchStagingTables") { db in
+            try db.create(table: TagBatchRun.databaseTableName) { t in
+                t.autoIncrementedPrimaryKey("id")
+                t.column("status", .text).notNull().defaults(to: TagBatchRunStatus.configure.rawValue)
+                t.column("scopeLabel", .text).notNull()
+                t.column("skipAlreadyApplied", .boolean).notNull().defaults(to: true)
+                t.column("concurrency", .integer).notNull().defaults(to: 3)
+                t.column("totalSelectedEntries", .integer).notNull().defaults(to: 0)
+                t.column("totalPlannedEntries", .integer).notNull().defaults(to: 0)
+                t.column("processedEntries", .integer).notNull().defaults(to: 0)
+                t.column("succeededEntries", .integer).notNull().defaults(to: 0)
+                t.column("failedEntries", .integer).notNull().defaults(to: 0)
+                t.column("keptProposalCount", .integer).notNull().defaults(to: 0)
+                t.column("discardedProposalCount", .integer).notNull().defaults(to: 0)
+                t.column("insertedEntryTagCount", .integer).notNull().defaults(to: 0)
+                t.column("createdTagCount", .integer).notNull().defaults(to: 0)
+                t.column("startedAt", .datetime)
+                t.column("completedAt", .datetime)
+                t.column("createdAt", .datetime).notNull().defaults(to: Date())
+                t.column("updatedAt", .datetime).notNull().defaults(to: Date())
+            }
+            try db.create(index: "idx_tag_batch_run_status_updated", on: TagBatchRun.databaseTableName, columns: ["status", "updatedAt"])
+            try db.create(index: "idx_tag_batch_run_created", on: TagBatchRun.databaseTableName, columns: ["createdAt"])
+
+            try db.create(table: TagBatchEntry.databaseTableName) { t in
+                t.autoIncrementedPrimaryKey("id")
+                t.column("runId", .integer)
+                    .notNull()
+                    .indexed()
+                    .references(TagBatchRun.databaseTableName, onDelete: .cascade)
+                t.column("entryId", .integer)
+                    .notNull()
+                    .indexed()
+                    .references(Entry.databaseTableName, onDelete: .cascade)
+                t.column("lifecycleState", .text).notNull().defaults(to: TagBatchEntryLifecycleState.neverStarted.rawValue)
+                t.column("attempts", .integer).notNull().defaults(to: 0)
+                t.column("providerProfileId", .integer)
+                    .references(AgentProviderProfile.databaseTableName, onDelete: .setNull)
+                t.column("modelProfileId", .integer)
+                    .references(AgentModelProfile.databaseTableName, onDelete: .setNull)
+                t.column("promptTokens", .integer)
+                t.column("completionTokens", .integer)
+                t.column("durationMs", .integer)
+                t.column("rawResponse", .text)
+                t.column("errorMessage", .text)
+                t.column("createdAt", .datetime).notNull().defaults(to: Date())
+                t.column("updatedAt", .datetime).notNull().defaults(to: Date())
+            }
+            try db.create(index: "idx_tag_batch_entry_run_state", on: TagBatchEntry.databaseTableName, columns: ["runId", "lifecycleState"])
+            try db.create(index: "idx_tag_batch_entry_run_entry", on: TagBatchEntry.databaseTableName, columns: ["runId", "entryId"], unique: true)
+
+            try db.create(table: TagBatchAssignmentStaging.databaseTableName) { t in
+                t.autoIncrementedPrimaryKey("id")
+                t.column("runId", .integer)
+                    .notNull()
+                    .indexed()
+                    .references(TagBatchRun.databaseTableName, onDelete: .cascade)
+                t.column("entryId", .integer)
+                    .notNull()
+                    .indexed()
+                    .references(Entry.databaseTableName, onDelete: .cascade)
+                t.column("normalizedName", .text).notNull()
+                t.column("displayName", .text).notNull()
+                t.column("resolvedTagId", .integer)
+                    .references(Tag.databaseTableName, onDelete: .setNull)
+                t.column("assignmentKind", .text).notNull()
+                t.column("createdAt", .datetime).notNull().defaults(to: Date())
+                t.column("updatedAt", .datetime).notNull().defaults(to: Date())
+            }
+            try db.create(index: "idx_tag_batch_assignment_run_entry", on: TagBatchAssignmentStaging.databaseTableName, columns: ["runId", "entryId"])
+            try db.create(index: "idx_tag_batch_assignment_run_name", on: TagBatchAssignmentStaging.databaseTableName, columns: ["runId", "normalizedName"])
+            try db.create(
+                index: "idx_tag_batch_assignment_unique",
+                on: TagBatchAssignmentStaging.databaseTableName,
+                columns: ["runId", "entryId", "normalizedName"],
+                unique: true
+            )
+
+            try db.create(table: TagBatchNewTagReview.databaseTableName) { t in
+                t.autoIncrementedPrimaryKey("id")
+                t.column("runId", .integer)
+                    .notNull()
+                    .indexed()
+                    .references(TagBatchRun.databaseTableName, onDelete: .cascade)
+                t.column("normalizedName", .text).notNull()
+                t.column("displayName", .text).notNull()
+                t.column("hitCount", .integer).notNull().defaults(to: 0)
+                t.column("sampleEntryCount", .integer).notNull().defaults(to: 0)
+                t.column("decision", .text).notNull().defaults(to: TagBatchReviewDecision.pending.rawValue)
+                t.column("createdAt", .datetime).notNull().defaults(to: Date())
+                t.column("updatedAt", .datetime).notNull().defaults(to: Date())
+            }
+            try db.create(index: "idx_tag_batch_review_run_decision", on: TagBatchNewTagReview.databaseTableName, columns: ["runId", "decision"])
+            try db.create(index: "idx_tag_batch_review_run_name", on: TagBatchNewTagReview.databaseTableName, columns: ["runId", "normalizedName"], unique: true)
+
+            try db.create(table: TagBatchApplyCheckpoint.databaseTableName) { t in
+                t.autoIncrementedPrimaryKey("id")
+                t.column("runId", .integer)
+                    .notNull()
+                    .indexed()
+                    .references(TagBatchRun.databaseTableName, onDelete: .cascade)
+                t.column("lastAppliedChunkIndex", .integer).notNull().defaults(to: 0)
+                t.column("totalChunks", .integer).notNull().defaults(to: 0)
+                t.column("lastAppliedEntryId", .integer)
+                t.column("updatedAt", .datetime).notNull().defaults(to: Date())
+            }
+            try db.create(index: "idx_tag_batch_checkpoint_run", on: TagBatchApplyCheckpoint.databaseTableName, columns: ["runId"], unique: true)
+        }
+
         // MARK: - Dev-only cleanup migrations
         // These migrations exist to clean up data produced during development.
         // They are compiled only in DEBUG builds and must be removed before the 1.0 release.
