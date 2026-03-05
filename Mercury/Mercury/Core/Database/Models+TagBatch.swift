@@ -4,6 +4,7 @@ import GRDB
 enum TagBatchRunStatus: String, Codable, CaseIterable, Sendable {
     case configure
     case running
+    case readyNext = "ready_next"
     case review
     case applying
     case done

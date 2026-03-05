@@ -67,7 +67,7 @@ Potential future extension (not required now): provider-specific guidance in the
 The panel is opened from `Settings > General > Tag System > Batch Tagging...`.
 
 State machine:
-`Configure -> Running -> Review -> Applying -> Done`
+`Configure -> Running -> ReadyNext -> (Review?) -> Applying -> Done`
 
 ## 3.1 Configure
 Fields:
@@ -89,11 +89,16 @@ Actions:
 Display:
 - progress (`processed / total`),
 - success/failure item counters,
-- current phase text (`Requesting`, `Parsing`, `Staging`),
-- optional ETA.
+- suggested-tag summary counters,
+- optional current phase text (`Requesting`, `Parsing`, `Staging`).
 
 Actions:
-- `Cancel run`: Halts further LLM processing. The run then automatically transitions to the `Review` phase for entries already processed successfully up to that point. This approach handles "pause/resume" user needs dynamically without a dedicated paused state.
+- `Stop` (branch action): Halts further LLM processing and exits active generation.
+- Run completion does **not** auto-advance to `Review`.
+
+Transition:
+- Whether finished naturally or via `Stop`, the run transitions to `ReadyNext`.
+- `ReadyNext` presents final running stats and waits for explicit user intent on the next step.
 
 Notes:
 - No modal error interruption for per-item failures.
@@ -106,19 +111,42 @@ Skip semantics:
 ## 3.3 Review
 Purpose: review only **new tag proposals**.
 
+Entry condition:
+- `Review` is shown only when `ReadyNext.newTagCount > 0`.
+- If `newTagCount == 0`, the main action in `ReadyNext` is `Apply` and the flow skips `Review`.
+
 Display:
+- top instruction text,
 - grouped by normalized proposal name,
 - each row shows proposal name + hit count + sample entries count.
 
 Actions:
 - row-level `Keep` / `Discard`,
-- bulk actions (`Keep All`, `Discard All`),
-- `Apply Decisions`,
-- `Cancel / Discard Run`: Ends the batch completely. Requires a strong warning confirmation, as this will discard all processed results and abort the task.
+- bulk actions (`Keep All`, `Discard All`) placed in footer left of primary action,
+- primary action `Apply Decisions` in footer right,
+- `Abort` in footer left (destructive lifecycle action).
 
 Matched existing tags are not reviewed one-by-one.
 
-## 3.4 Applying
+## 3.4 ReadyNext
+Purpose: explicit checkpoint between generation and downstream steps.
+
+Display:
+- processed/total,
+- succeeded/failed,
+- suggested tags total,
+- new tags count,
+- guidance text:
+  - if new tags exist: "Review required before apply",
+  - else: "No new tags to review; apply directly or abort".
+
+Actions:
+- primary action (right, default/Enter):
+  - `Review` if `newTagCount > 0`,
+  - `Apply` if `newTagCount == 0`.
+- `Abort` on the left (Esc).
+
+## 3.5 Applying
 Display:
 - chunked apply progress (`chunk x/y`),
 - inserted/ignored counters.
@@ -128,7 +156,7 @@ Behavior:
 - partial progress persisted for resume,
 - cancel stops future chunks (already applied chunks remain committed).
 
-## 3.5 Done
+## 3.6 Done
 Summary:
 - total selected / processed entries,
 - failed item count,
@@ -142,13 +170,25 @@ Summary:
 ## 4. Window Lifecycle and Interaction Rules
 
 ## 4.1 Can users close the task sheet and Settings window?
-No. While a batch is in progress (`Running`, `Review`, `Applying`), the Settings window and Batch Tagging sheet cannot be closed (to preserve task context explicitly).
+No. While a batch is lifecycle-active (`Running`, `ReadyNext`, `Review`, `Applying`), the Settings window and Batch Tagging sheet cannot be closed (to preserve task context explicitly).
 However, users can switch focus back to the main app window and continue reading.
 
 ## 4.2 Settings lock policy during batch lifecycle
-When stage is `Running`, `Review`, or `Applying`:
+When stage is `Running`, `ReadyNext`, `Review`, or `Applying`:
 - disable unrelated settings controls (prevent configuration drift),
 - keep only batch panel entry and run status interactive.
+
+## 4.4 Footer Action Semantics (Unified)
+- Left side is always negative/backward semantics:
+  - `Close` for non-active states,
+  - `Abort` for active lifecycle states.
+- Right side uses positive/forward semantics with one primary default button:
+  - `Start`, `Review`, `Apply`, `Apply Decisions`.
+- Branch/support actions are placed immediately left of the primary button:
+  - e.g. `Reset to Default`, `Keep All`, `Discard All`, `Stop`.
+- Keyboard behavior:
+  - primary button = Enter (`defaultAction`),
+  - negative button = Esc (`cancelAction`).
 
 Rationale:
 - avoid mid-run mutation of model routes/prompt settings that can invalidate run assumptions.
@@ -521,3 +561,73 @@ These two fixes are mandatory and must land first:
   - `AgentRunCore.waitingLimit(for:)` must permit configured `0` (no implicit `max(1, ...)` for waiting slots).
 2. `AppModel` runtime policy fix:
   - remove the current `.tagging: 2` deviation and align with confirmed policy for panel + batch behavior.
+
+---
+
+## 11. Tagging Prompt Optimization Plan (Shared by Panel + Batch)
+
+Status:
+- Planned, not implemented yet.
+- Intentionally documented now and scheduled for a later implementation pass.
+
+### 11.1 Scope and Constraints
+
+- Keep a single tagging prompt template shared by panel tagging and batch tagging.
+  - Do not split a batch-only template at this stage.
+- Improve behavior for both large and small existing tag libraries.
+- Do not depend on unstable NLP-derived relevance signals in this iteration.
+
+### 11.2 Target Quality Problems
+
+This plan addresses two recurring issues observed in real runs:
+
+1. Over-trusting existing vocabulary:
+  - Existing tags are reused even when article evidence is weak or absent.
+2. Over-general labels:
+  - Broad labels (for example, `Programming`) are selected too often instead of content-specific tags.
+
+### 11.3 Prompt-Level Changes (Single Shared Template)
+
+Refine the shared `tagging.default` instructions with these rule priorities:
+
+1. Evidence-first priority:
+  - Content evidence from title/body is stronger than vocabulary availability.
+  - Existing tags must not be reused when the article has no clear evidence.
+2. Allow empty output:
+  - Returning `[]` is valid and preferred over low-confidence forced labels.
+3. Generic-label control:
+  - Broad labels are allowed only when clearly justified by content.
+  - Broad labels should not be the only output if specific evidence exists.
+4. Specificity requirement:
+  - Prefer concrete topic tags over umbrella categories.
+
+These changes remain output-compatible: JSON array of strings only.
+
+### 11.4 Post-Processing Guardrail Policy (High-Precision Only)
+
+Guardrails are optional and must favor precision over coverage.
+
+Rules:
+- Only block a suggested tag when confidence is very high that it is unsupported.
+- If confidence is not high, do not block; keep the suggestion.
+- Avoid aggressive filtering that can hollow out AI suggestions.
+
+Rollout strategy:
+1. Shadow mode first:
+  - Evaluate would-block candidates without mutating output.
+  - Record diagnostics for calibration.
+2. Enable strict blocking only for highly reliable patterns.
+3. Keep broad-label checks conservative to minimize false positives.
+
+### 11.5 Non-Goals for This Iteration
+
+- No `relevantExistingTags` injection path.
+- No template bifurcation between panel and batch.
+- No assumption that larger existing vocabularies are always available.
+
+### 11.6 Acceptance Criteria (Future Implementation)
+
+- Both panel and batch show reduced unsupported reuse of existing tags.
+- Broad generic tags appear less often when specific evidence exists.
+- No large drop in useful suggestion coverage.
+- Guardrail false positives remain low enough to avoid user-visible regressions.

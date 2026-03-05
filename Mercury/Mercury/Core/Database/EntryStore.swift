@@ -583,6 +583,7 @@ final class EntryStore: ObservableObject {
                 """,
                 arguments: [
                     TagBatchRunStatus.running.rawValue,
+                    TagBatchRunStatus.readyNext.rawValue,
                     TagBatchRunStatus.review.rawValue,
                     TagBatchRunStatus.applying.rawValue
                 ]
@@ -622,6 +623,7 @@ final class EntryStore: ObservableObject {
                 """,
                 arguments: [
                     TagBatchRunStatus.running.rawValue,
+                    TagBatchRunStatus.readyNext.rawValue,
                     TagBatchRunStatus.review.rawValue,
                     TagBatchRunStatus.applying.rawValue
                 ]

@@ -59,12 +59,15 @@ struct TagBatchApplyIdempotencyTests {
                 #expect(resolvedSwiftTag.usageCount == 3)
                 #expect(resolvedSwiftTag.isProvisional == false)
 
-                let stagingEntryCount = try TagBatchEntry.filter(Column("runId") == setup.runId).fetchCount(db)
+                let persistedBatchEntries = try TagBatchEntry
+                    .filter(Column("runId") == setup.runId)
+                    .fetchAll(db)
                 let stagingAssignmentCount = try TagBatchAssignmentStaging.filter(Column("runId") == setup.runId).fetchCount(db)
                 let reviewCount = try TagBatchNewTagReview.filter(Column("runId") == setup.runId).fetchCount(db)
                 let checkpointCount = try TagBatchApplyCheckpoint.filter(Column("runId") == setup.runId).fetchCount(db)
 
-                #expect(stagingEntryCount == 0)
+                #expect(persistedBatchEntries.count == setup.entryIds.count)
+                #expect(persistedBatchEntries.allSatisfy { $0.lifecycleState == .applied })
                 #expect(stagingAssignmentCount == 0)
                 #expect(reviewCount == 0)
                 #expect(checkpointCount == 0)

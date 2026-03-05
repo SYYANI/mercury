@@ -59,9 +59,6 @@
         }
       }
     },
-    "10 entries" : {
-
-    },
     "12 months" : {
       "localizations" : {
         "zh-Hans" : {
@@ -81,6 +78,12 @@
           }
         }
       }
+    },
+    "Abort Batch Run" : {
+
+    },
+    "Aborting removes all staged batch data and cannot be undone." : {
+
     },
     "Add" : {
       "localizations" : {
@@ -248,6 +251,9 @@
         }
       }
     },
+    "Apply" : {
+
+    },
     "Apply Decisions" : {
 
     },
@@ -329,6 +335,9 @@
           }
         }
       }
+    },
+    "Batch Apply Completed" : {
+
     },
     "Batch Tagging" : {
 
@@ -845,15 +854,6 @@
 
     },
     "Discard All" : {
-
-    },
-    "Discard Batch Run" : {
-
-    },
-    "Discard Run" : {
-
-    },
-    "Discarding removes all staged batch data and cannot be undone." : {
 
     },
     "Display Name" : {
@@ -1659,6 +1659,12 @@
         }
       }
     },
+    "New tags require review before apply." : {
+
+    },
+    "New tags: %lld" : {
+
+    },
     "No debug issues recorded." : {
       "localizations" : {
         "zh-Hans" : {
@@ -1688,6 +1694,9 @@
           }
         }
       }
+    },
+    "No new tags to review. You can apply directly, or abort the run." : {
+
     },
     "No output yet" : {
       "localizations" : {
@@ -2287,6 +2296,9 @@
     "Rounded Sans" : {
       "shouldTranslate" : false
     },
+    "Run completed. Review the result summary and choose the next step." : {
+
+    },
     "Running" : {
 
     },
@@ -2456,7 +2468,10 @@
     "Start Batch" : {
 
     },
-    "Stop and Enter Review" : {
+    "Stop" : {
+
+    },
+    "Stopping..." : {
 
     },
     "Streaming" : {
@@ -2501,6 +2516,9 @@
           }
         }
       }
+    },
+    "Suggested tags: %lld" : {
+
     },
     "Summary" : {
       "localizations" : {

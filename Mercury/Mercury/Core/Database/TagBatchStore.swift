@@ -53,6 +53,7 @@ final class TagBatchStore {
         try await db.read { db in
             let activeStatuses = [
                 TagBatchRunStatus.running.rawValue,
+                TagBatchRunStatus.readyNext.rawValue,
                 TagBatchRunStatus.review.rawValue,
                 TagBatchRunStatus.applying.rawValue
             ]
@@ -76,6 +77,7 @@ final class TagBatchStore {
             try TagBatchRun
                 .filter(
                     Column("status") == TagBatchRunStatus.running.rawValue
+                    || Column("status") == TagBatchRunStatus.readyNext.rawValue
                     || Column("status") == TagBatchRunStatus.review.rawValue
                     || Column("status") == TagBatchRunStatus.applying.rawValue
                 )
@@ -309,6 +311,24 @@ final class TagBatchStore {
         }
     }
 
+    func loadRunSuggestionStats(runId: Int64) async throws -> (totalSuggestedTags: Int, newTagCount: Int) {
+        try await db.read { db in
+            let totalSuggested = try Int.fetchOne(
+                db,
+                sql: "SELECT COUNT(*) FROM tag_batch_assignment_staging WHERE runId = ?",
+                arguments: [runId]
+            ) ?? 0
+
+            let newTagCount = try Int.fetchOne(
+                db,
+                sql: "SELECT COUNT(*) FROM tag_batch_new_tag_review WHERE runId = ?",
+                arguments: [runId]
+            ) ?? 0
+
+            return (totalSuggested, newTagCount)
+        }
+    }
+
     func loadAssignments(runId: Int64) async throws -> [TagBatchAssignmentStaging] {
         try await db.read { db in
             try TagBatchAssignmentStaging
@@ -432,11 +452,19 @@ final class TagBatchStore {
         }
     }
 
-    func clearRunStagingData(runId: Int64) async throws {
+    func clearRunStagingData(runId: Int64, preserveAppliedEntries: Bool = false) async throws {
         try await db.write { db in
             try db.execute(sql: "DELETE FROM tag_batch_assignment_staging WHERE runId = ?", arguments: [runId])
             try db.execute(sql: "DELETE FROM tag_batch_new_tag_review WHERE runId = ?", arguments: [runId])
-            try db.execute(sql: "DELETE FROM tag_batch_entry WHERE runId = ?", arguments: [runId])
+            if preserveAppliedEntries {
+                // Keep applied rows intact for future analysis/debugging and skipAlreadyApplied filtering.
+                try db.execute(
+                    sql: "DELETE FROM tag_batch_entry WHERE runId = ? AND lifecycleState <> ?",
+                    arguments: [runId, TagBatchEntryLifecycleState.applied.rawValue]
+                )
+            } else {
+                try db.execute(sql: "DELETE FROM tag_batch_entry WHERE runId = ?", arguments: [runId])
+            }
             try db.execute(sql: "DELETE FROM tag_batch_apply_checkpoint WHERE runId = ?", arguments: [runId])
         }
     }

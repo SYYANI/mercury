@@ -8,6 +8,9 @@ struct BatchTaggingSheetView: View {
     @StateObject private var viewModel = BatchTaggingSheetViewModel()
     @State private var isDiscardConfirmPresented = false
     @State private var isStartConfirmPresented = false
+    @State private var isCompletionAlertPresented = false
+    @State private var completionAlertMessage = ""
+    @State private var lastCompletionAlertRunId: Int64?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -28,22 +31,35 @@ struct BatchTaggingSheetView: View {
         .onChange(of: viewModel.skipAlreadyApplied) { _, _ in
             Task { await viewModel.refreshCandidateCount() }
         }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NSWindowDidBecomeKeyNotification"))) { _ in
+            Task { await viewModel.refreshCandidateCount() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NSWindowDidBecomeMainNotification"))) { _ in
+            Task { await viewModel.refreshCandidateCount() }
+        }
+        .onChange(of: viewModel.status) { _, newStatus in
+            guard newStatus == .done, let runId = viewModel.runId else { return }
+            guard lastCompletionAlertRunId != runId else { return }
+            completionAlertMessage = viewModel.completionSummary
+            lastCompletionAlertRunId = runId
+            isCompletionAlertPresented = true
+        }
         .confirmationDialog(
-            String(localized: "Discard Batch Run", bundle: bundle),
+            String(localized: "Abort Batch Run", bundle: bundle),
             isPresented: $isDiscardConfirmPresented,
             titleVisibility: .visible
         ) {
             Button(role: .destructive) {
                 Task { await viewModel.discardRun() }
             } label: {
-                Text("Discard", bundle: bundle)
+                Text("Abort", bundle: bundle)
             }
             Button(role: .cancel) {
             } label: {
                 Text("Cancel", bundle: bundle)
             }
         } message: {
-            Text("Discarding removes all staged batch data and cannot be undone.", bundle: bundle)
+            Text("Aborting removes all staged batch data and cannot be undone.", bundle: bundle)
         }
         .alert(
             String(localized: "Large Batch Confirmation", bundle: bundle),
@@ -58,6 +74,16 @@ struct BatchTaggingSheetView: View {
                 "Large target size detected. Please confirm scope and settings before starting. This batch may consume a large amount of tokens and take considerable time. If a paid provider is used, costs may be significant.",
                 bundle: bundle
             )
+        }
+        .alert(
+            String(localized: "Batch Apply Completed", bundle: bundle),
+            isPresented: $isCompletionAlertPresented
+        ) {
+            Button(String(localized: "OK", bundle: bundle)) {
+                dismiss()
+            }
+        } message: {
+            Text(completionAlertMessage)
         }
     }
 
@@ -85,6 +111,8 @@ struct BatchTaggingSheetView: View {
             configurePane
         case .running:
             runningPane
+        case .readyNext:
+            readyNextPane
         case .review:
             reviewPane
         case .applying:
@@ -98,7 +126,6 @@ struct BatchTaggingSheetView: View {
                 HStack(spacing: 8) {
                     Text("Tagging entries", bundle: bundle)
                     Picker(selection: $viewModel.scope) {
-                        Text("10 entries", bundle: bundle).tag(TagBatchSelectionScope.tenEntries)
                         Text("1 week", bundle: bundle).tag(TagBatchSelectionScope.pastWeek)
                         Text("1 month", bundle: bundle).tag(TagBatchSelectionScope.pastMonth)
                         Text("3 months", bundle: bundle).tag(TagBatchSelectionScope.pastThreeMonths)
@@ -212,12 +239,38 @@ struct BatchTaggingSheetView: View {
             }
 
             Spacer()
+        }
+    }
 
-            Button(role: .destructive) {
-                Task { await viewModel.requestCancelRunning() }
-            } label: {
-                Text("Stop and Enter Review", bundle: bundle)
+    private var readyNextPane: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Run completed. Review the result summary and choose the next step.", bundle: bundle)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            Text("Processed \(viewModel.processedCount) / \(max(viewModel.totalCandidateCount, 1))", bundle: bundle)
+                .font(.subheadline)
+
+            HStack(spacing: 12) {
+                Text("Succeeded: \(viewModel.succeededCount)", bundle: bundle)
+                Text("Failed: \(viewModel.failedCount)", bundle: bundle)
+                Text("Suggested tags: \(viewModel.totalSuggestedTags)", bundle: bundle)
+                Text("New tags: \(viewModel.newTagCount)", bundle: bundle)
             }
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+
+            if viewModel.hasReviewRequired {
+                Text("New tags require review before apply.", bundle: bundle)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("No new tags to review. You can apply directly, or abort the run.", bundle: bundle)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
         }
     }
 
@@ -226,29 +279,6 @@ struct BatchTaggingSheetView: View {
             Text("Review new tag proposals before apply.", bundle: bundle)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-
-            HStack(spacing: 8) {
-                Button {
-                    Task { await viewModel.setAllReviewDecisions(decision: .keep) }
-                } label: {
-                    Text("Keep All", bundle: bundle)
-                }
-
-                Button {
-                    Task { await viewModel.setAllReviewDecisions(decision: .discard) }
-                } label: {
-                    Text("Discard All", bundle: bundle)
-                }
-
-                Spacer()
-
-                Button {
-                    Task { await viewModel.applyDecisions() }
-                } label: {
-                    Text("Apply Decisions", bundle: bundle)
-                }
-                .buttonStyle(.borderedProminent)
-            }
 
             List(viewModel.reviewRows, id: \.normalizedName) { row in
                 HStack(spacing: 12) {
@@ -304,7 +334,15 @@ struct BatchTaggingSheetView: View {
 
     private var footer: some View {
         HStack(spacing: 10) {
-            if viewModel.isLifecycleLocked == false {
+            if viewModel.isLifecycleLocked {
+                Button(role: .destructive) {
+                    isDiscardConfirmPresented = true
+                } label: {
+                    Text("Abort", bundle: bundle)
+                }
+                .keyboardShortcut(.cancelAction)
+                .disabled(viewModel.isBusy || viewModel.status == .running)
+            } else {
                 Button {
                     dismiss()
                 } label: {
@@ -313,6 +351,59 @@ struct BatchTaggingSheetView: View {
             }
 
             Spacer()
+
+            if viewModel.status == .review {
+                if viewModel.reviewRows.isEmpty == false {
+                    Button {
+                        Task { await viewModel.setAllReviewDecisions(decision: .keep) }
+                    } label: {
+                        Text("Keep All", bundle: bundle)
+                    }
+
+                    Button {
+                        Task { await viewModel.setAllReviewDecisions(decision: .discard) }
+                    } label: {
+                        Text("Discard All", bundle: bundle)
+                    }
+                }
+
+                Button {
+                    Task { await viewModel.applyDecisions() }
+                } label: {
+                    Text("Apply Decisions", bundle: bundle)
+                }
+                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
+                .disabled(viewModel.isBusy || viewModel.hasPendingReviewDecisions)
+            }
+
+            if viewModel.status == .running {
+                Button {
+                    Task { await viewModel.requestCancelRunning() }
+                } label: {
+                    if viewModel.isStopRequested {
+                        HStack(spacing: 6) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("Stopping...", bundle: bundle)
+                        }
+                    } else {
+                        Text("Stop", bundle: bundle)
+                    }
+                }
+                .disabled(viewModel.isBusy || viewModel.isStopRequested)
+            }
+
+            if viewModel.status == .readyNext {
+                Button {
+                    Task { await viewModel.continueFromReadyNext() }
+                } label: {
+                    Text(viewModel.hasReviewRequired ? "Review" : "Apply", bundle: bundle)
+                }
+                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
+                .disabled(viewModel.isBusy)
+            }
 
             if viewModel.canStart {
                 Button {
@@ -332,16 +423,8 @@ struct BatchTaggingSheetView: View {
                     Text("Start Batch", bundle: bundle)
                 }
                 .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
                 .disabled(viewModel.isBusy || viewModel.isStartBlocked)
-            }
-
-            if viewModel.isLifecycleLocked {
-                Button(role: .destructive) {
-                    isDiscardConfirmPresented = true
-                } label: {
-                    Text("Discard Run", bundle: bundle)
-                }
-                .disabled(viewModel.isBusy)
             }
         }
     }
@@ -357,6 +440,8 @@ struct BatchTaggingSheetView: View {
             return String(localized: "Configure", bundle: bundle)
         case .running:
             return String(localized: "Running", bundle: bundle)
+        case .readyNext:
+            return String(localized: "Ready", bundle: bundle)
         case .review:
             return String(localized: "Review", bundle: bundle)
         case .applying:

@@ -9,7 +9,6 @@ struct TagBatchStartRequest: Sendable {
 }
 
 enum TagBatchSelectionScope: String, CaseIterable, Identifiable, Sendable {
-    case tenEntries = "ten_entries"
     case pastWeek = "past_week"
     case pastMonth = "past_month"
     case pastThreeMonths = "past_three_months"
@@ -228,9 +227,16 @@ extension AppModel {
                 await onEvent(.transitioned(runId: runId, status: .running))
 
                 if filteredEntryIDs.isEmpty {
+                    if try await self.isTagBatchRunCancelled(runId: runId, batchStore: batchStore) {
+                        isTagBatchLifecycleActive = false
+                        await onEvent(.transitioned(runId: runId, status: .cancelled))
+                        await onEvent(.terminal(.cancelled(failureReason: .cancelled)))
+                        return
+                    }
                     try await batchStore.rebuildReviewRowsFromAssignments(runId: runId)
-                    try await batchStore.updateRunStatus(runId: runId, status: .review)
-                    await onEvent(.transitioned(runId: runId, status: .review))
+                    try await batchStore.updateRunStatus(runId: runId, status: .readyNext)
+                    isTagBatchLifecycleActive = true
+                    await onEvent(.transitioned(runId: runId, status: .readyNext))
                     await onEvent(.terminal(.succeeded))
                     return
                 }
@@ -326,10 +332,17 @@ extension AppModel {
                     }
                 }
 
+                if try await self.isTagBatchRunCancelled(runId: runId, batchStore: batchStore) {
+                    isTagBatchLifecycleActive = false
+                    await onEvent(.transitioned(runId: runId, status: .cancelled))
+                    await onEvent(.terminal(.cancelled(failureReason: .cancelled)))
+                    return
+                }
+
                 try await batchStore.rebuildReviewRowsFromAssignments(runId: runId)
-                try await batchStore.updateRunStatus(runId: runId, status: .review)
+                try await batchStore.updateRunStatus(runId: runId, status: .readyNext)
                 isTagBatchLifecycleActive = true
-                await onEvent(.transitioned(runId: runId, status: .review))
+                await onEvent(.transitioned(runId: runId, status: .readyNext))
                 await onEvent(.terminal(.succeeded))
             } catch {
                 try? await batchStore.updateRunStatus(runId: runId, status: .failed, completedAt: Date())
@@ -346,8 +359,27 @@ extension AppModel {
         await tagBatchRunControlCenter.requestStop(taskId: taskId)
     }
 
-    func discardTaggingBatchRun(runId: Int64) async throws {
+    func discardTaggingBatchRun(runId: Int64, taskId: UUID? = nil) async throws {
         let batchStore = TagBatchStore(db: database)
+        guard let run = try await batchStore.loadRun(id: runId) else {
+            throw NSError(
+                domain: "Mercury.TagBatch",
+                code: 404,
+                userInfo: [NSLocalizedDescriptionKey: "Batch run not found."]
+            )
+        }
+
+        guard run.status != .running else {
+            throw NSError(
+                domain: "Mercury.TagBatch",
+                code: 400,
+                userInfo: [NSLocalizedDescriptionKey: "Batch run is still running. Stop first and wait for in-flight requests to complete before aborting."]
+            )
+        }
+
+        if let taskId {
+            await tagBatchRunControlCenter.requestStop(taskId: taskId)
+        }
         try await batchStore.clearRunStagingData(runId: runId)
         try await batchStore.updateRunStatus(runId: runId, status: .cancelled, completedAt: Date())
         isTagBatchLifecycleActive = false
@@ -355,6 +387,34 @@ extension AppModel {
 
     func loadTaggingBatchReviewRows(runId: Int64) async throws -> [TagBatchNewTagReview] {
         try await TagBatchStore(db: database).loadReviewRows(runId: runId)
+    }
+
+    func loadTaggingBatchSuggestionStats(runId: Int64) async throws -> (totalSuggestedTags: Int, newTagCount: Int) {
+        try await TagBatchStore(db: database).loadRunSuggestionStats(runId: runId)
+    }
+
+    func enterTaggingBatchReview(runId: Int64) async throws {
+        let batchStore = TagBatchStore(db: database)
+        guard let run = try await batchStore.loadRun(id: runId) else {
+            throw NSError(
+                domain: "Mercury.TagBatch",
+                code: 404,
+                userInfo: [NSLocalizedDescriptionKey: "Batch run not found."]
+            )
+        }
+
+        guard run.status == .readyNext || run.status == .review else {
+            throw NSError(
+                domain: "Mercury.TagBatch",
+                code: 400,
+                userInfo: [NSLocalizedDescriptionKey: "Batch run is not ready for review."]
+            )
+        }
+
+        if run.status != .review {
+            try await batchStore.updateRunStatus(runId: runId, status: .review)
+        }
+        isTagBatchLifecycleActive = true
     }
 
     func setTaggingBatchReviewDecision(
@@ -390,7 +450,7 @@ extension AppModel {
             )
         }
 
-        guard run.status == .review || run.status == .applying else {
+        guard run.status == .readyNext || run.status == .review || run.status == .applying else {
             throw NSError(
                 domain: "Mercury.TagBatch",
                 code: 400,
@@ -474,7 +534,7 @@ extension AppModel {
             insertedEntryTagCount: insertedEntryTagCount,
             createdTagCount: createdTagCount
         )
-        try await batchStore.clearRunStagingData(runId: runId)
+        try await batchStore.clearRunStagingData(runId: runId, preserveAppliedEntries: true)
         isTagBatchLifecycleActive = false
 
         await onEvent(.transitioned(runId: runId, status: .done))
@@ -483,6 +543,13 @@ extension AppModel {
 }
 
 private extension AppModel {
+    func isTagBatchRunCancelled(runId: Int64, batchStore: TagBatchStore) async throws -> Bool {
+        guard let run = try await batchStore.loadRun(id: runId) else {
+            return false
+        }
+        return run.status == .cancelled
+    }
+
     func buildTagBatchEntryWhereClause(
         scope: TagBatchSelectionScope,
         skipAlreadyApplied: Bool
@@ -491,8 +558,6 @@ private extension AppModel {
         var arguments: StatementArguments = []
 
         switch scope {
-        case .tenEntries:
-            break
         case .pastWeek:
             conditions.append("COALESCE(entry.publishedAt, entry.createdAt) >= ?")
             arguments += [Date().addingTimeInterval(-7 * 24 * 60 * 60)]
@@ -532,8 +597,6 @@ private extension AppModel {
 
     func selectionLimit(for scope: TagBatchSelectionScope) -> Int? {
         switch scope {
-        case .tenEntries:
-            return 10
         case .pastWeek, .pastMonth, .pastThreeMonths, .pastSixMonths, .pastTwelveMonths, .allEntries, .unreadEntries:
             return nil
         }
