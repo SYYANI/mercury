@@ -14,12 +14,13 @@ struct AgentRunCoreContractsTests {
         #expect(first.taskId != second.taskId)
     }
 
-    @Test("Runtime waiting policy defaults freeze per-kind baseline to one")
+    @Test("Runtime waiting policy defaults freeze per-kind baseline")
     func runtimeWaitingPolicyDefaults() {
         let policy = AgentRuntimePolicy()
 
         #expect(policy.waitingLimit(for: .summary) == 1)
         #expect(policy.waitingLimit(for: .translation) == 1)
-        #expect(policy.waitingLimit(for: .tagging) == 1)
+        #expect(policy.waitingLimit(for: .tagging) == 0)
+        #expect(policy.waitingLimit(for: .taggingBatch) == 0)
     }
 }

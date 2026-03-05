@@ -128,7 +128,7 @@ nonisolated struct AgentRuntimePolicy: Sendable {
     }
 
     func waitingLimit(for taskKind: AgentTaskKind) -> Int {
-        max(1, perTaskWaitingLimit[taskKind] ?? 1)
+        max(0, perTaskWaitingLimit[taskKind] ?? 1)
     }
 }
 

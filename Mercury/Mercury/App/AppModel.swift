@@ -81,7 +81,8 @@ final class AppModel: ObservableObject {
                 perTaskConcurrencyLimit: [
                     .summary: 1,
                     .translation: 1,
-                    .tagging: 2
+                    .tagging: 1,
+                    .taggingBatch: 1
                 ]
             )
         )
