@@ -1265,6 +1265,9 @@
         }
       }
     },
+    "Hide related content" : {
+
+    },
     "hits: %lld, entries: %lld" : {
       "localizations" : {
         "en" : {
@@ -2095,6 +2098,7 @@
       }
     },
     "Related Content" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2431,6 +2435,9 @@
           }
         }
       }
+    },
+    "Show related content" : {
+
     },
     "Show unread entries only" : {
       "localizations" : {

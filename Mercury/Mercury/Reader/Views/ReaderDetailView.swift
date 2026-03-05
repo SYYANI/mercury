@@ -59,6 +59,7 @@ struct ReaderDetailView: View {
     @State private var entryTags: [Tag] = []
     @State var isTagPanelPresented = false
     @State private var relatedEntries: [EntryListItem] = []
+    @AppStorage("Reader.RelatedContent.IsExpanded") private var isRelatedContentExpanded = true
 
     // MARK: - Body
 
@@ -165,6 +166,14 @@ struct ReaderDetailView: View {
             }
 
             entryHeader
+
+            if relatedEntries.isEmpty == false && isRelatedContentExpanded {
+                ReaderRelatedEntriesView(
+                    entries: relatedEntries
+                ) { entryId in
+                    onSelectEntry?(entryId)
+                }
+            }
 
             topPaneContent(parsedURL: parsedURL)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -362,10 +371,31 @@ struct ReaderDetailView: View {
 
     private var entryHeader: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(selectedEntry?.title ?? String(localized: "(Untitled)", bundle: bundle))
-                .font(.title3)
-                .fontWeight(.semibold)
-                .lineLimit(2)
+            HStack(alignment: .top, spacing: 8) {
+                Text(selectedEntry?.title ?? String(localized: "(Untitled)", bundle: bundle))
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                    .lineLimit(2)
+
+                Spacer(minLength: 0)
+
+                if relatedEntries.isEmpty == false {
+                    Button {
+                        isRelatedContentExpanded.toggle()
+                    } label: {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 22, height: 22)
+                    }
+                    .buttonStyle(.plain)
+                    .help(
+                        isRelatedContentExpanded
+                        ? String(localized: "Hide related content", bundle: bundle)
+                        : String(localized: "Show related content", bundle: bundle)
+                    )
+                }
+            }
 
             if entryTags.isEmpty == false {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -417,12 +447,6 @@ struct ReaderDetailView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(nsColor: .textBackgroundColor))
-
-            if relatedEntries.isEmpty == false {
-                ReaderRelatedEntriesView(entries: relatedEntries) { entryId in
-                    onSelectEntry?(entryId)
-                }
-            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

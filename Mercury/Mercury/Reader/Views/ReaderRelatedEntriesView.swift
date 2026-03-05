@@ -5,8 +5,8 @@
 
 import SwiftUI
 
-/// A horizontal scroll strip of related entry cards shown at the bottom
-/// of the reader pane. Entries are ranked by shared-tag co-occurrence.
+/// A horizontal strip of related entry cards.
+/// Entries are ranked by shared-tag co-occurrence.
 struct ReaderRelatedEntriesView: View {
     let entries: [EntryListItem]
     let onSelectEntry: (Int64) -> Void
@@ -14,27 +14,17 @@ struct ReaderRelatedEntriesView: View {
     @Environment(\.localizationBundle) var bundle
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("Related Content", bundle: bundle)
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 16)
-                .padding(.top, 10)
-                .padding(.bottom, 8)
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(alignment: .top, spacing: 10) {
-                    ForEach(entries) { item in
-                        relatedEntryCard(item)
-                    }
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(alignment: .top, spacing: 10) {
+                ForEach(entries) { item in
+                    relatedEntryCard(item)
                 }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 12)
             }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 12)
+            .padding(.top, 4)
         }
         .background(Color(nsColor: .windowBackgroundColor))
-        .overlay(Divider(), alignment: .top)
     }
 
     private func relatedEntryCard(_ item: EntryListItem) -> some View {
