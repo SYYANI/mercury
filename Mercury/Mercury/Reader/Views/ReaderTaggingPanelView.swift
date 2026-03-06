@@ -199,10 +199,10 @@ struct ReaderTaggingPanelView: View {
             switch event {
             case .started:
                 break
-            case .notice(let message):
+            case .notice(let notice):
                 await MainActor.run {
                     topBannerMessage = ReaderBannerMessage(
-                        text: message,
+                        text: AgentRuntimeProjection.taggingNoticeMessage(notice),
                         secondaryAction: .openDebugIssues
                     )
                 }

@@ -192,6 +192,14 @@ struct AgentRuntimeProjectionTests {
         }
     }
 
+    @Test("Tagging typed notice projects shared prompt fallback message")
+    @MainActor func taggingTypedNoticeProjectsPromptFallbackMessage() {
+        withEnglishLanguage {
+            let message = AgentRuntimeProjection.taggingNoticeMessage(.promptTemplateFallback)
+            #expect(message == "Custom Tagging prompt is invalid. Using built-in prompt.")
+        }
+    }
+
     @Test("Content suppresses placeholder regardless of other flags")
     func contentWins() {
         let text = AgentRuntimeProjection.placeholderText(

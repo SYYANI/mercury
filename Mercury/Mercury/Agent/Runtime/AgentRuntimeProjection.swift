@@ -299,6 +299,15 @@ nonisolated enum AgentRuntimeProjection {
         }
     }
 
+    @MainActor static func taggingNoticeMessage(_ notice: TaggingPanelNotice) -> String {
+        switch notice {
+        case .promptTemplateFallback:
+            return AgentPromptCustomizationConfig.tagging.invalidTemplateFallbackMessage(
+                bundle: LanguageManager.shared.bundle
+            )
+        }
+    }
+
     @MainActor static func translationWaitingStatus() -> String {
         phaseDisplayStrings().waiting
     }

@@ -13,9 +13,13 @@ struct TaggingPanelRequest: Sendable {
     let body: String
 }
 
+enum TaggingPanelNotice: Sendable, Equatable {
+    case promptTemplateFallback
+}
+
 enum TaggingPanelEvent: Sendable {
     case started(UUID)
-    case notice(String)
+    case notice(TaggingPanelNotice)
     // Resolved tag names (existing canonical names or preserved-display new proposals).
     case completed([String])
     case terminal(TaskTerminalOutcome)
@@ -60,7 +64,7 @@ extension AppModel {
         _ = await enqueueTask(
             taskId: resolvedTaskID,
             kind: .tagging,
-            title: "Tagging",
+            title: AppTaskKind.tagging.displayTitle,
             priority: .userInitiated,
             executionTimeout: TaskTimeoutPolicy.executionTimeout(for: AppTaskKind.tagging)
         ) { [self, database, credentialStore] executionContext in
@@ -70,7 +74,9 @@ extension AppModel {
 
             let startedAt = Date()
             do {
-                let template = try await loadPromptTemplate(config: .tagging) { await onEvent(.notice($0)) }
+                let template = try await loadPromptTemplate(config: .tagging) { _ in
+                    await onEvent(.notice(.promptTemplateFallback))
+                }
 
                 let success = try await runTaggingPanelExecution(
                     request: request,
