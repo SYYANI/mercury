@@ -104,14 +104,21 @@ extension ReaderSummaryView {
         // For user-initiated runs, check availability before touching the runtime engine.
         // Auto-triggered paths skip this guard — they are already gated by the auto-run policy.
         if requestSource == .manual, !appModel.isSummaryAgentAvailable {
-            topBannerMessage = ReaderBannerMessage(
-                text: AgentRuntimeProjection.availabilityMessage(
+            topBannerMessage = AgentMessageHostAdapter.readerBannerMessage(
+                from: AgentRuntimeProjection.availabilityProjectedMessage(
                     for: .summary,
                     summaryAvailable: appModel.isSummaryAgentAvailable,
                     translationAvailable: appModel.isTranslationAgentAvailable,
                     taggingAvailable: appModel.isTaggingAgentAvailable
                 ),
-                action: ReaderBannerMessage.BannerAction(label: String(localized: "Open Settings", bundle: bundle)) { openSettings() }
+                actionHandler: { actionID in
+                    switch actionID {
+                    case .openSettings:
+                        return { openSettings() }
+                    default:
+                        return nil
+                    }
+                }
             )
             return
         }
@@ -385,9 +392,8 @@ extension ReaderSummaryView {
             if let runningOwner {
                 summaryNoticeByOwner[runningOwner] = notice
             }
-            topBannerMessage = ReaderBannerMessage(
-                text: AgentRuntimeProjection.summaryNoticeMessage(notice),
-                secondaryAction: .openDebugIssues
+            topBannerMessage = AgentMessageHostAdapter.readerBannerMessage(
+                from: AgentRuntimeProjection.summaryNoticeProjectedMessage(notice)
             )
         case .token(let token):
             summaryActivePhase = .generating
@@ -447,14 +453,18 @@ extension ReaderSummaryView {
             case .failed, .timedOut:
                 let shouldShowFailureMessage = displayedEntryId == entryId
                 if shouldShowFailureMessage, isSummaryRunning == false {
-                    let bannerText = AgentRuntimeProjection.terminalBannerMessage(
+                    let projected = AgentRuntimeProjection.terminalProjectedMessage(
                         for: outcome,
                         taskKind: .summary,
-                        noticeText: notice.map { AgentRuntimeProjection.summaryNoticeMessage($0) }
-                    ) ?? AgentRuntimeProjection.failureMessage(for: .unknown, taskKind: .summary)
-                    topBannerMessage = ReaderBannerMessage(
-                        text: bannerText,
-                        secondaryAction: .openDebugIssues
+                        noticeText: notice.map { AgentRuntimeProjection.summaryNoticeMessage($0) },
+                        secondaryActionID: .openDebugIssues
+                    ) ?? AgentRuntimeProjection.terminalProjectedMessage(
+                        for: .failed(failureReason: .unknown, message: nil),
+                        taskKind: .summary,
+                        secondaryActionID: .openDebugIssues
+                    )
+                    topBannerMessage = AgentMessageHostAdapter.readerBannerMessage(
+                        from: projected
                     )
                     if summaryText.isEmpty {
                         summaryPlaceholderText = AgentRuntimeProjection.summaryNoContentStatus()

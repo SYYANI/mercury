@@ -5,14 +5,21 @@ extension ReaderTranslationView {
 
     func toggleTranslationMode() {
         guard appModel.isTranslationAgentAvailable else {
-            topBannerMessage = ReaderBannerMessage(
-                text: AgentRuntimeProjection.availabilityMessage(
+            topBannerMessage = AgentMessageHostAdapter.readerBannerMessage(
+                from: AgentRuntimeProjection.availabilityProjectedMessage(
                     for: .translation,
                     summaryAvailable: appModel.isSummaryAgentAvailable,
                     translationAvailable: appModel.isTranslationAgentAvailable,
                     taggingAvailable: appModel.isTaggingAgentAvailable
                 ),
-                action: ReaderBannerMessage.BannerAction(label: String(localized: "Open Settings", bundle: bundle)) { openSettings() }
+                actionHandler: { actionID in
+                    switch actionID {
+                    case .openSettings:
+                        return { openSettings() }
+                    default:
+                        return nil
+                    }
+                }
             )
             return
         }

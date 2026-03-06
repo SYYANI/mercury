@@ -138,9 +138,8 @@ extension ReaderTranslationView {
         case .notice(let notice):
             translationNoticeByOwner[request.owner] = notice
             if request.owner.entryId == displayedEntryId {
-                topBannerMessage = ReaderBannerMessage(
-                    text: AgentRuntimeProjection.translationNoticeMessage(notice),
-                    secondaryAction: .openDebugIssues
+                topBannerMessage = AgentMessageHostAdapter.readerBannerMessage(
+                    from: AgentRuntimeProjection.translationNoticeProjectedMessage(notice)
                 )
             }
         case .segmentCompleted(let sourceSegmentId, let translatedText):
@@ -212,19 +211,37 @@ extension ReaderTranslationView {
                     let failedSegmentIDs = terminalProjection?.failedSegmentIDs
                         ?? translatableSegmentIDs(in: request.projectionSnapshot)
                     if request.owner.entryId == displayedEntryId {
-                        let bannerText = AgentRuntimeProjection.terminalBannerMessage(
+                        let projected = AgentRuntimeProjection.terminalProjectedMessage(
                             for: outcome,
                             taskKind: .translation,
-                            noticeText: notice.map { AgentRuntimeProjection.translationNoticeMessage($0) }
-                        ) ?? AgentRuntimeProjection.failureMessage(for: .unknown, taskKind: .translation)
+                            noticeText: notice.map { AgentRuntimeProjection.translationNoticeMessage($0) },
+                            primaryActionID: .openDebugIssues,
+                            secondaryActionID: .retryFailedSegments
+                        ) ?? AgentRuntimeProjection.terminalProjectedMessage(
+                            for: .failed(failureReason: .unknown, message: nil),
+                            taskKind: .translation,
+                            primaryActionID: .openDebugIssues,
+                            secondaryActionID: .retryFailedSegments
+                        )
                         await MainActor.run {
-                            topBannerMessage = ReaderBannerMessage(
-                                text: bannerText,
-                                action: ReaderBannerMessage.BannerAction.openDebugIssues,
-                                secondaryAction: makeRetryFailedBannerAction(
-                                    slotKey: request.slotKey,
-                                    failedSegmentIDs: failedSegmentIDs
-                                )
+                            topBannerMessage = AgentMessageHostAdapter.readerBannerMessage(
+                                from: projected,
+                                actionHandler: { actionID in
+                                    switch actionID {
+                                    case .retryFailedSegments:
+                                        return {
+                                            Task {
+                                                await retryTranslationSegments(
+                                                    entryId: request.slotKey.entryId,
+                                                    slotKey: request.slotKey,
+                                                    requestedSegmentIDs: failedSegmentIDs
+                                                )
+                                            }
+                                        }
+                                    default:
+                                        return nil
+                                    }
+                                }
                             )
                         }
                     }
@@ -359,12 +376,24 @@ extension ReaderTranslationView {
               coverage.unresolvedSegmentIDs.isEmpty == false else {
             return nil
         }
-        return ReaderBannerMessage(
-            text: String(localized: "Translation completed with missing segments.", bundle: bundle),
-            secondaryAction: makeRetryFailedBannerAction(
-                slotKey: slotKey,
-                failedSegmentIDs: coverage.unresolvedSegmentIDs
-            )
+        return AgentMessageHostAdapter.readerBannerMessage(
+            from: AgentRuntimeProjection.translationPartialCompletionProjectedMessage(),
+            actionHandler: { actionID in
+                switch actionID {
+                case .retryFailedSegments:
+                    return {
+                        Task {
+                            await retryTranslationSegments(
+                                entryId: slotKey.entryId,
+                                slotKey: slotKey,
+                                requestedSegmentIDs: coverage.unresolvedSegmentIDs
+                            )
+                        }
+                    }
+                default:
+                    return nil
+                }
+            }
         )
     }
 
@@ -383,20 +412,24 @@ extension ReaderTranslationView {
         guard unresolvedSegmentIDs.isEmpty == false else {
             return nil
         }
-        return ReaderBannerMessage(
-            text: String(localized: "Partial translation found. Resume to continue.", bundle: bundle),
-            action: ReaderBannerMessage.BannerAction(
-                label: String(localized: "Resume Translation", bundle: bundle),
-                handler: {
-                    Task {
-                        await retryTranslationSegments(
-                            entryId: slotKey.entryId,
-                            slotKey: slotKey,
-                            requestedSegmentIDs: unresolvedSegmentIDs
-                        )
+        return AgentMessageHostAdapter.readerBannerMessage(
+            from: AgentRuntimeProjection.translationResumeAvailableProjectedMessage(),
+            actionHandler: { actionID in
+                switch actionID {
+                case .resumeTranslation:
+                    return {
+                        Task {
+                            await retryTranslationSegments(
+                                entryId: slotKey.entryId,
+                                slotKey: slotKey,
+                                requestedSegmentIDs: unresolvedSegmentIDs
+                            )
+                        }
                     }
+                default:
+                    return nil
                 }
-            )
+            }
         )
     }
 
@@ -503,28 +536,6 @@ extension ReaderTranslationView {
         } else {
             setReaderHTML(snapshotContext.sourceReaderHTML)
         }
-    }
-
-    @MainActor
-    func makeRetryFailedBannerAction(
-        slotKey: TranslationSlotKey,
-        failedSegmentIDs: Set<String>
-    ) -> ReaderBannerMessage.BannerAction? {
-        guard failedSegmentIDs.isEmpty == false else {
-            return nil
-        }
-        return ReaderBannerMessage.BannerAction(
-            label: String(localized: "Retry failed segments", bundle: bundle),
-            handler: {
-                Task {
-                    await retryTranslationSegments(
-                        entryId: slotKey.entryId,
-                        slotKey: slotKey,
-                        requestedSegmentIDs: failedSegmentIDs
-                    )
-                }
-            }
-        )
     }
 
     @MainActor

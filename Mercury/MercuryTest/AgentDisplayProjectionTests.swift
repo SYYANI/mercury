@@ -176,6 +176,34 @@ struct AgentRuntimeProjectionTests {
         #expect(AgentMessageHostAdapter.batchSheetFooterModel(from: projected) == nil)
     }
 
+    @Test("Projected reader banner bridges custom action handlers")
+    func projectedReaderBannerBridgesCustomHandlers() {
+        let projected = AgentProjectedMessage(
+            primaryText: "Need configuration",
+            secondaryText: nil,
+            severity: .warning,
+            primaryAction: AgentProjectedMessageAction(id: .openSettings, label: "Open Settings"),
+            secondaryAction: nil,
+            host: .readerTopBanner
+        )
+
+        let banner = AgentMessageHostAdapter.readerBannerMessage(
+            from: projected,
+            actionHandler: { actionID in
+                switch actionID {
+                case .openSettings:
+                    return {}
+                default:
+                    return nil
+                }
+            }
+        )
+
+        #expect(banner?.text == "Need configuration")
+        #expect(banner?.severity == .warning)
+        #expect(banner?.action?.label == "Open Settings")
+    }
+
     @Test("Summary typed notice projects shared prompt fallback message")
     @MainActor func summaryTypedNoticeProjectsPromptFallbackMessage() {
         withEnglishLanguage {
@@ -197,6 +225,44 @@ struct AgentRuntimeProjectionTests {
         withEnglishLanguage {
             let message = AgentRuntimeProjection.taggingNoticeMessage(.promptTemplateFallback)
             #expect(message == "Custom Tagging prompt is invalid. Using built-in prompt.")
+        }
+    }
+
+    @Test("Availability projected message includes settings action")
+    @MainActor func availabilityProjectedMessageIncludesSettingsAction() {
+        withEnglishLanguage {
+            let projected = AgentRuntimeProjection.availabilityProjectedMessage(
+                for: .summary,
+                summaryAvailable: false,
+                translationAvailable: false,
+                taggingAvailable: false
+            )
+
+            #expect(projected.host == .readerTopBanner)
+            #expect(projected.primaryAction?.id == .openSettings)
+            #expect(projected.primaryAction?.label == "Open Settings")
+        }
+    }
+
+    @Test("Translation partial completion projected message includes retry action")
+    @MainActor func translationPartialCompletionProjectedMessageIncludesRetryAction() {
+        withEnglishLanguage {
+            let projected = AgentRuntimeProjection.translationPartialCompletionProjectedMessage()
+
+            #expect(projected.host == .readerTopBanner)
+            #expect(projected.secondaryAction?.id == .retryFailedSegments)
+            #expect(projected.secondaryAction?.label == "Retry failed segments")
+        }
+    }
+
+    @Test("Translation resume projected message includes resume action")
+    @MainActor func translationResumeProjectedMessageIncludesResumeAction() {
+        withEnglishLanguage {
+            let projected = AgentRuntimeProjection.translationResumeAvailableProjectedMessage()
+
+            #expect(projected.host == .readerTopBanner)
+            #expect(projected.primaryAction?.id == .resumeTranslation)
+            #expect(projected.primaryAction?.label == "Resume Translation")
         }
     }
 

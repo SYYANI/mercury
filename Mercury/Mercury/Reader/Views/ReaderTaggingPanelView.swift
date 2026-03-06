@@ -201,9 +201,8 @@ struct ReaderTaggingPanelView: View {
                 break
             case .notice(let notice):
                 await MainActor.run {
-                    topBannerMessage = ReaderBannerMessage(
-                        text: AgentRuntimeProjection.taggingNoticeMessage(notice),
-                        secondaryAction: .openDebugIssues
+                    topBannerMessage = AgentMessageHostAdapter.readerBannerMessage(
+                        from: AgentRuntimeProjection.taggingNoticeProjectedMessage(notice)
                     )
                 }
             case .completed(let tagNames):
@@ -362,7 +361,9 @@ struct ReaderTaggingPanelView: View {
             await loadAvailableTags()
             await onTagsChanged()
         } catch {
-            topBannerMessage = ReaderBannerMessage(text: AgentRuntimeProjection.taggingUpdateFailedMessage())
+            topBannerMessage = AgentMessageHostAdapter.readerBannerMessage(
+                from: AgentRuntimeProjection.taggingUpdateFailedProjectedMessage()
+            )
         }
     }
 
@@ -379,7 +380,9 @@ struct ReaderTaggingPanelView: View {
             await loadAvailableTags()
             await onTagsChanged()
         } catch {
-            topBannerMessage = ReaderBannerMessage(text: AgentRuntimeProjection.taggingUpdateFailedMessage())
+            topBannerMessage = AgentMessageHostAdapter.readerBannerMessage(
+                from: AgentRuntimeProjection.taggingUpdateFailedProjectedMessage()
+            )
         }
     }
 
@@ -394,7 +397,9 @@ struct ReaderTaggingPanelView: View {
             await loadAvailableTags()
             await onTagsChanged()
         } catch {
-            topBannerMessage = ReaderBannerMessage(text: AgentRuntimeProjection.taggingUpdateFailedMessage())
+            topBannerMessage = AgentMessageHostAdapter.readerBannerMessage(
+                from: AgentRuntimeProjection.taggingUpdateFailedProjectedMessage()
+            )
         }
     }
 
@@ -410,7 +415,9 @@ struct ReaderTaggingPanelView: View {
             await loadAvailableTags()
             await onTagsChanged()
         } catch {
-            topBannerMessage = ReaderBannerMessage(text: AgentRuntimeProjection.taggingUpdateFailedMessage())
+            topBannerMessage = AgentMessageHostAdapter.readerBannerMessage(
+                from: AgentRuntimeProjection.taggingUpdateFailedProjectedMessage()
+            )
         }
     }
 

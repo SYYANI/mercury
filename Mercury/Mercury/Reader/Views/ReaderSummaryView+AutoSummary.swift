@@ -136,14 +136,21 @@ extension ReaderSummaryView {
               summaryText.isEmpty,
               !summaryAvailabilityBannerSuppressed else { return }
         summaryAvailabilityBannerSuppressed = true
-        topBannerMessage = ReaderBannerMessage(
-            text: AgentRuntimeProjection.availabilityMessage(
+        topBannerMessage = AgentMessageHostAdapter.readerBannerMessage(
+            from: AgentRuntimeProjection.availabilityProjectedMessage(
                 for: .summary,
                 summaryAvailable: appModel.isSummaryAgentAvailable,
                 translationAvailable: appModel.isTranslationAgentAvailable,
                 taggingAvailable: appModel.isTaggingAgentAvailable
             ),
-            action: ReaderBannerMessage.BannerAction(label: String(localized: "Open Settings", bundle: bundle)) { openSettings() }
+            actionHandler: { actionID in
+                switch actionID {
+                case .openSettings:
+                    return { openSettings() }
+                default:
+                    return nil
+                }
+            }
         )
     }
 }

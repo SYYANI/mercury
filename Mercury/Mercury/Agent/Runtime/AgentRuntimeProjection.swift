@@ -17,6 +17,8 @@ nonisolated enum AgentMessageSeverity: String, Equatable, Sendable {
 nonisolated enum AgentProjectedMessageActionID: String, Equatable, Sendable {
     case openSettings
     case openDebugIssues
+    case resumeTranslation
+    case retryFailedSegments
 }
 
 nonisolated struct AgentProjectedMessageAction: Equatable, Sendable {
@@ -50,6 +52,23 @@ nonisolated struct AgentHostRenderedMessageModel: Equatable, Sendable {
 }
 
 nonisolated enum AgentMessageHostAdapter {
+    static func readerBannerMessage(
+        from message: AgentProjectedMessage?,
+        actionHandler: ((AgentProjectedMessageActionID) -> (() -> Void)?)? = nil
+    ) -> ReaderBannerMessage? {
+        guard let message,
+              let model = readerBannerModel(from: message) else {
+            return nil
+        }
+
+        return ReaderBannerMessage(
+            text: model.primaryText,
+            severity: model.severity,
+            action: makeReaderBannerAction(from: message.primaryAction, actionHandler: actionHandler),
+            secondaryAction: makeReaderBannerAction(from: message.secondaryAction, actionHandler: actionHandler)
+        )
+    }
+
     static func readerBannerModel(from message: ReaderBannerMessage?) -> AgentHostRenderedMessageModel? {
         guard let message else {
             return nil
@@ -122,6 +141,25 @@ nonisolated enum AgentMessageHostAdapter {
 
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private static func makeReaderBannerAction(
+        from action: AgentProjectedMessageAction?,
+        actionHandler: ((AgentProjectedMessageActionID) -> (() -> Void)?)?
+    ) -> ReaderBannerMessage.BannerAction? {
+        guard let action else {
+            return nil
+        }
+
+        if action.id == .openDebugIssues {
+            return ReaderBannerMessage.BannerAction.openDebugIssues
+        }
+
+        guard let handler = actionHandler?(action.id) else {
+            return nil
+        }
+
+        return ReaderBannerMessage.BannerAction(label: action.label, handler: handler)
     }
 }
 
@@ -244,6 +282,41 @@ nonisolated struct AgentRuntimeStatusProjection: Equatable, Sendable {
 }
 
 nonisolated enum AgentRuntimeProjection {
+    @MainActor private static func actionLabel(for id: AgentProjectedMessageActionID) -> String {
+        let bundle = LanguageManager.shared.bundle
+
+        switch id {
+        case .openSettings:
+            return String(localized: "Open Settings", bundle: bundle)
+        case .openDebugIssues:
+            return "Open Debug View"
+        case .resumeTranslation:
+            return String(localized: "Resume Translation", bundle: bundle)
+        case .retryFailedSegments:
+            return String(localized: "Retry failed segments", bundle: bundle)
+        }
+    }
+
+    @MainActor private static func action(_ id: AgentProjectedMessageActionID) -> AgentProjectedMessageAction {
+        AgentProjectedMessageAction(id: id, label: actionLabel(for: id))
+    }
+
+    @MainActor private static func readerBannerProjectedMessage(
+        text: String,
+        severity: AgentMessageSeverity = .warning,
+        primaryActionID: AgentProjectedMessageActionID? = nil,
+        secondaryActionID: AgentProjectedMessageActionID? = nil
+    ) -> AgentProjectedMessage {
+        AgentProjectedMessage(
+            primaryText: text,
+            secondaryText: nil,
+            severity: severity,
+            primaryAction: primaryActionID.map(action),
+            secondaryAction: secondaryActionID.map(action),
+            host: .readerTopBanner
+        )
+    }
+
     @MainActor static func summaryNoContentStatus() -> String {
         String(localized: "No summary", bundle: LanguageManager.shared.bundle)
     }
@@ -294,6 +367,13 @@ nonisolated enum AgentRuntimeProjection {
         }
     }
 
+    @MainActor static func summaryNoticeProjectedMessage(_ notice: SummaryRunNotice) -> AgentProjectedMessage {
+        readerBannerProjectedMessage(
+            text: summaryNoticeMessage(notice),
+            secondaryActionID: .openDebugIssues
+        )
+    }
+
     @MainActor static func translationNoticeMessage(_ notice: TranslationRunNotice) -> String {
         switch notice {
         case .promptTemplateFallback:
@@ -303,6 +383,13 @@ nonisolated enum AgentRuntimeProjection {
         }
     }
 
+    @MainActor static func translationNoticeProjectedMessage(_ notice: TranslationRunNotice) -> AgentProjectedMessage {
+        readerBannerProjectedMessage(
+            text: translationNoticeMessage(notice),
+            secondaryActionID: .openDebugIssues
+        )
+    }
+
     @MainActor static func taggingNoticeMessage(_ notice: TaggingPanelNotice) -> String {
         switch notice {
         case .promptTemplateFallback:
@@ -310,6 +397,13 @@ nonisolated enum AgentRuntimeProjection {
                 bundle: LanguageManager.shared.bundle
             )
         }
+    }
+
+    @MainActor static func taggingNoticeProjectedMessage(_ notice: TaggingPanelNotice) -> AgentProjectedMessage {
+        readerBannerProjectedMessage(
+            text: taggingNoticeMessage(notice),
+            secondaryActionID: .openDebugIssues
+        )
     }
 
     @MainActor static func availabilityMessage(
@@ -351,8 +445,43 @@ nonisolated enum AgentRuntimeProjection {
         }
     }
 
+    @MainActor static func availabilityProjectedMessage(
+        for taskKind: AgentTaskKind,
+        summaryAvailable: Bool,
+        translationAvailable: Bool,
+        taggingAvailable: Bool
+    ) -> AgentProjectedMessage {
+        readerBannerProjectedMessage(
+            text: availabilityMessage(
+                for: taskKind,
+                summaryAvailable: summaryAvailable,
+                translationAvailable: translationAvailable,
+                taggingAvailable: taggingAvailable
+            ),
+            primaryActionID: .openSettings
+        )
+    }
+
     @MainActor static func taggingUpdateFailedMessage() -> String {
         String(localized: "Tag update failed", bundle: LanguageManager.shared.bundle)
+    }
+
+    @MainActor static func taggingUpdateFailedProjectedMessage() -> AgentProjectedMessage {
+        readerBannerProjectedMessage(text: taggingUpdateFailedMessage())
+    }
+
+    @MainActor static func translationPartialCompletionProjectedMessage() -> AgentProjectedMessage {
+        readerBannerProjectedMessage(
+            text: String(localized: "Translation completed with missing segments.", bundle: LanguageManager.shared.bundle),
+            secondaryActionID: .retryFailedSegments
+        )
+    }
+
+    @MainActor static func translationResumeAvailableProjectedMessage() -> AgentProjectedMessage {
+        readerBannerProjectedMessage(
+            text: String(localized: "Partial translation found. Resume to continue.", bundle: LanguageManager.shared.bundle),
+            primaryActionID: .resumeTranslation
+        )
     }
 
     @MainActor static func translationWaitingStatus() -> String {
@@ -586,6 +715,29 @@ nonisolated enum AgentRuntimeProjection {
             return "\(noticeText) \(failureText)"
         }
         return failureText
+    }
+
+    @MainActor static func terminalProjectedMessage(
+        for outcome: TaskTerminalOutcome,
+        taskKind: AgentTaskKind,
+        noticeText: String? = nil,
+        primaryActionID: AgentProjectedMessageActionID? = nil,
+        secondaryActionID: AgentProjectedMessageActionID? = nil
+    ) -> AgentProjectedMessage? {
+        guard let text = terminalBannerMessage(
+            for: outcome,
+            taskKind: taskKind,
+            noticeText: noticeText
+        ) else {
+            return nil
+        }
+
+        return readerBannerProjectedMessage(
+            text: text,
+            severity: .error,
+            primaryActionID: primaryActionID,
+            secondaryActionID: secondaryActionID
+        )
     }
 
     private static func normalizeMessageText(_ text: String?) -> String? {

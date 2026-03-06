@@ -128,6 +128,24 @@ struct AgentRuntimeFailureProjectionTests {
         }
     }
 
+    @Test("Builds translation terminal projected message with actions")
+    func translationTerminalProjectedMessageIncludesStructuredActions() {
+        withEnglishLanguage {
+            let projected = AgentRuntimeProjection.terminalProjectedMessage(
+                for: .failed(failureReason: .network, message: "network error"),
+                taskKind: .translation,
+                noticeText: "Custom Translation prompt is invalid. Using built-in prompt.",
+                primaryActionID: .openDebugIssues,
+                secondaryActionID: .retryFailedSegments
+            )
+
+            #expect(projected?.primaryText == "Custom Translation prompt is invalid. Using built-in prompt. Network error.")
+            #expect(projected?.primaryAction?.id == .openDebugIssues)
+            #expect(projected?.secondaryAction?.id == .retryFailedSegments)
+            #expect(projected?.host == .readerTopBanner)
+        }
+    }
+
     @Test("Builds shared tagging update failure message")
     func taggingUpdateFailedMessage() {
         withEnglishLanguage {
