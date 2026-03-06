@@ -2143,17 +2143,6 @@
         }
       }
     },
-    "Related Content" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "相关内容"
-          }
-        }
-      }
-    },
     "Rename" : {
       "localizations" : {
         "zh-Hans" : {

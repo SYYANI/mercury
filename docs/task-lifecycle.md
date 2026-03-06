@@ -332,7 +332,7 @@ Scope:
 
 Deliverables:
 - mapping module used by all projections.
-- deprecated old direct cross-enum conversions behind shim APIs only.
+- direct cross-enum conversions stay behind the canonical mapping helpers rather than leaking back into business logic.
 
 Acceptance:
 - no direct business logic depends on multiple kind enums without canonical mapping helper.

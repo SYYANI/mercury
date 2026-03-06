@@ -106,7 +106,7 @@ The translate button remains visible. No `onChange` observer needed on the trans
 
 #### 1.6 Error surface rules for agent failures
 
-All agent run failures must surface **exclusively** through the Reader banner. No modal alerts, no status bar writes.
+Reader-bound agent run failures must surface through the Reader banner. Batch Tagging failures must surface through the batch sheet's fixed projected-message area. No modal alerts, no status bar writes.
 
 - `FailurePolicy.shouldSurfaceFailureToUser(kind:)` returns `false` for `.summary` and `.translation`.
 - `AppModel+SummaryExecution` and `AppModel+TranslationExecution` skip `reportDebugIssue` when `failureReason == .noModelRoute` or `failureReason == .invalidConfiguration` — these are user-configurable states, not diagnostic anomalies.

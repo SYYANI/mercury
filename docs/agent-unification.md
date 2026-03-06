@@ -1,7 +1,7 @@
 # Agent Unification Plan
 
 > Date: 2026-03-06
-> Status: Draft for execution
+> Status: Completed
 > Scope: Summary, Translation, single-entry Tagging, and Batch Tagging user-facing execution flow
 
 This document consolidates the recent analysis on batch-sheet string ownership and cross-agent execution inconsistencies.
@@ -37,35 +37,19 @@ The following decisions are now confirmed and should be treated as implementatio
 All blocking policy decisions have now been confirmed.
 This section records the guardrails that must constrain implementation.
 
-### 1.2.1 Escape hatch policy for non-structured message text
+### 1.2.1 Typed notice policy
 
 This policy is confirmed.
 
-To avoid ambiguity, this document uses `freeformText(String)` below instead of `customFreeform(String)`.
-
-What it means:
-
-- a message payload that enters the presentation pipeline as already-authored text rather than as a typed semantic case;
-- intended only for migration, externally supplied text that the product intentionally shows verbatim, or truly non-structurable cases.
+The adopted implementation does not introduce one cross-agent notice enum.
+Instead, each task keeps a small typed notice enum and shared projection converts those typed notices into one projected-message contract.
 
 Practical interpretation:
 
-- migration-only use must disappear by the end of the unification iteration that introduced it;
-- externally supplied text is expected to be variable runtime content, not app-authored string literals routed through the escape hatch;
-- truly non-structurable cases are not pre-approved categories; they must be justified case by case when encountered.
-
-What it does not mean:
-
-- not a normal path for app-authored prompt fallback copy;
-- not a normal path for failure messages;
-- not a normal path for task titles, phase labels, or reusable notices.
-
-Confirmed default:
-
-- keep exactly one explicit `freeformText(String)` escape hatch;
-- do not use it when the message can be represented by a typed semantic case;
-- treat any new persistent use of `freeformText(String)` as design debt that should be reviewed and either removed or justified.
-- do not use `freeformText(String)` for new app-authored string literals.
+- do not use raw `notice(String)` payloads for reusable app-authored notices;
+- keep task-local notice enums small and semantic;
+- route shared semantics such as prompt-template fallback through shared projection/helpers rather than re-authoring strings in execution code;
+- if a future requirement genuinely needs externally supplied freeform text, treat that as a separate design decision rather than a default path.
 
 ### 1.2.2 Structured message composition policy
 
@@ -168,8 +152,8 @@ Why this is a problem:
 
 Recommended solution:
 
-- Replace all string notice channels with typed notice enums or one shared notice model.
-- Keep freeform strings only for truly dynamic external content that cannot be expressed semantically.
+- Replace all string notice channels with typed notice enums.
+- Keep shared semantics aligned in the projection layer instead of requiring one cross-task notice enum.
 
 ## 3.2 Failure projection inconsistency
 
@@ -257,7 +241,7 @@ The most important clarification is that semantic unification does not require o
 
 The intended model is:
 
-- one shared semantic message contract;
+- one shared projected-message contract;
 - one shared projected-message result shape;
 - one shared projection layer for reusable wording;
 - a task-specific presentation policy that decides where the projected message appears.
@@ -327,27 +311,15 @@ The following should now be treated as fixed rather than open:
 - A task may support actions on the projected message, and those actions should also be described structurally rather than built ad hoc in each view.
 - When a shared presentation facility exists for an agent-task concern, task-specific code must call into that facility instead of forking a parallel implementation.
 
-## 4.1 Shared semantic notice model
+## 4.1 Typed notices with shared projection
 
-Introduce one shared user-notice model for agent tasks, for example:
+The adopted shape is:
 
-```swift
-enum AgentUserNotice: Sendable, Equatable {
-    case promptTemplateFallback(taskKind: AppTaskKind)
-    case waitingForModelRoute(taskKind: AppTaskKind)
-    case usingFallbackModel(taskKind: AppTaskKind)
-    case partialCompletion(taskKind: AppTaskKind, succeeded: Int, failed: Int)
-    case reviewRequired(taskKind: AppTaskKind)
-    case freeformText(String)
-}
-```
+- each task emits typed notices using its own small notice enum;
+- shared semantics are aligned by projection, not by forcing all tasks into one shared enum;
+- the shared contract consumed by hosts is `AgentProjectedMessage`, not a single cross-task notice type.
 
-The exact cases may differ, but the architectural rule should hold:
-
-- shared semantics use typed cases;
-- freeform strings are explicit escape hatches, not the default path.
-
-Summary, Translation, single-entry Tagging, and Batch Tagging should all emit notice events using this shared semantic model or a thin task-specific wrapper around it.
+This keeps execution events strongly typed while avoiding an extra wrapper layer that would mostly mirror task-local enums.
 
 ## 4.2 Shared notice-to-text projection
 
@@ -355,7 +327,7 @@ Introduce one projection/helper to convert typed notices into localized text.
 
 Example responsibility split:
 
-- execution layer: emits `.promptTemplateFallback(taskKind: .summary)`;
+- execution layer: emits `.promptTemplateFallback` on the task-local notice enum;
 - UI or shared projection layer: converts it to the localized fallback string;
 - presentation policy: decides whether it goes to Reader banner, inline panel status, batch sheet fixed slot, or another approved host.
 - view: renders the already projected message in the host selected by policy.
@@ -429,22 +401,21 @@ This section intentionally prefers a more complete unification pass instead of a
 
 ## 5.1 Step 1: Introduce the shared message contracts
 
-Create the shared notice type, shared projected-message result shape, shared notice/failure projection helper, and shared host-surface policy contract.
+Create the shared projected-message result shape, shared notice/failure projection helper, and shared host-surface policy contract.
 
 Required actions:
 
-- define the shared notice model in a cross-agent shared module;
+- replace raw string notice payloads with typed task-local notice enums;
 - define the shared projected-message result shape;
 - add localized projection for each notice kind;
 - define centralized host-surface policy for each task kind;
 - define structured optional message actions so links/buttons are configured semantically instead of view-locally;
 - define centralized severity and conflict-arbitration rules for Reader-banner-hosted tasks;
-- keep one explicit `freeformText(String)` escape hatch for unavoidable dynamic text;
 - make prompt-template fallback a typed notice case immediately.
 
 Deliverable:
 
-- one semantic notice model plus one projected-message model and one host policy model that can be consumed by Summary, Translation, Tagging, and Batch Tagging.
+- one projected-message model and one host policy model that can be consumed by Summary, Translation, Tagging, and Batch Tagging, with reusable notices emitted as typed task-local events.
 
 ## 5.2 Step 2: Build shared host rendering adapters
 
@@ -525,7 +496,7 @@ Deliverable:
 
 - one failure/message projection policy across all four tasks, with host-surface choice treated as a parameter rather than a semantic difference.
 
-## 5.7 Step 7: Rebase Batch Tagging onto the shared notice model
+## 5.7 Step 7: Rebase Batch Tagging onto the shared projection contract
 
 Batch Tagging should move after shared projection rules are stable, not before.
 In practice, the batch path depends on the final shared rules for notice wording, failure projection, task titles, and optional actions.
@@ -533,15 +504,15 @@ Rebasing earlier creates avoidable rework because the batch sheet would first ad
 
 Required actions:
 
-- either replace `TagBatchRunNotice` with the shared notice model;
-- or wrap batch-local notices around shared notices for shared cases;
+- keep `TagBatchRunNotice` for batch-local lifecycle semantics;
+- reuse shared projection helpers for shared semantics such as prompt-template fallback and terminal failures;
 - keep batch-only notice cases for review/apply-specific semantics;
 - move any newly shared notice wording into the shared projection helper.
 - map projected messages into one fixed, always-available status slot inside the batch sheet instead of using the Reader banner host.
 
 Preferred direction:
 
-- use the shared notice model directly for shared semantics;
+- keep task-local typed notices and route them through the shared projection layer.
 - reserve batch-local notice cases only for truly batch-exclusive workflow messages.
 - make the batch-sheet projection slot structurally explicit so it serves the same semantic role as the Reader banner for the other tasks.
 
@@ -571,14 +542,18 @@ Deliverable:
 
 ## 5.9 Step 9: Remove dead interfaces and legacy compatibility shims
 
-After migration, delete the legacy paths rather than keeping both models alive.
+Final cleanup should remove migration leftovers, but only where the caller graph proves the bridge is no longer needed.
 
-Required actions:
+Completed outcomes:
 
-- remove obsolete `notice(String)` variants;
-- remove dead local helper switches replaced by shared projection;
-- remove transitional wrappers once no caller needs them;
-- update docs to reflect the new single presentation contract.
+- obsolete `notice(String)` variants across Summary, Translation, single-entry Tagging, and Batch Tagging are gone;
+- dead local batch status/scope label switches were replaced by shared semantic helpers where reuse existed;
+- reusable action labels now come from shared projection helpers rather than duplicated surface-local literals;
+- documentation now describes the unified presentation contract instead of an in-progress migration.
+
+Retained intentionally:
+
+- the Reader host still stores `ReaderBannerMessage` as its local view state, so the bridge between projected messages and the legacy reader banner model remains a required adapter rather than dead compatibility code.
 
 Deliverable:
 
@@ -625,6 +600,7 @@ The unification work should be considered complete only when all of the followin
 - Batch Tagging uses a fixed sheet-local projection area with the same semantic projection contract.
 - Reader-banner conflict resolution is centrally defined and not re-implemented by each Reader task.
 - The project has no new task-specific fallback/failure/presentation helpers that duplicate an approved shared facility.
+- Typed task-local notices are allowed; a single cross-task notice enum is not required.
 - Reusable semantic labels are not duplicated across views.
 - View-local strings that remain local are clearly screen-specific, not accidental re-implementations of shared semantics.
 - Tests validate semantics, not repeated ad-hoc user strings in multiple places.
