@@ -286,9 +286,6 @@
         }
       }
     },
-    "Authentication failed. Check tagging agent settings." : {
-
-    },
     "Auto" : {
       "localizations" : {
         "zh-Hans" : {
@@ -371,24 +368,6 @@
 
     },
     "Batch Tagging" : {
-
-    },
-    "Batch tagging configuration is invalid. Check settings." : {
-
-    },
-    "Batch tagging failed. Check Debug Issues." : {
-
-    },
-    "Batch tagging input is not available for the selected entries." : {
-
-    },
-    "Batch tagging returned an invalid model response format." : {
-
-    },
-    "Batch tagging timed out." : {
-
-    },
-    "Batch tagging was cancelled." : {
 
     },
     "Batch Tagging..." : {
@@ -715,9 +694,6 @@
           }
         }
       }
-    },
-    "Custom tagging prompt is invalid. Using built-in prompt for this batch run." : {
-
     },
     "Dark" : {
       "localizations" : {
@@ -1116,9 +1092,6 @@
           }
         }
       }
-    },
-    "Failed to persist batch tagging data. Check Debug Issues." : {
-
     },
     "Failed to save result. Check Debug Issues." : {
       "localizations" : {
@@ -1700,9 +1673,6 @@
         }
       }
     },
-    "Network error while running batch tagging." : {
-
-    },
     "Network error." : {
       "localizations" : {
         "zh-Hans" : {
@@ -1740,9 +1710,6 @@
       }
     },
     "No eligible entries found for the selected scope." : {
-
-    },
-    "No model route is available for batch tagging. Check agent settings." : {
 
     },
     "No model route. Check agent settings." : {
@@ -1797,6 +1764,9 @@
           }
         }
       }
+    },
+    "No tagging source available." : {
+
     },
     "No tags yet" : {
       "localizations" : {
