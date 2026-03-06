@@ -22,6 +22,7 @@ enum ReaderBuildError: Error {
 
 struct ReaderBannerMessage {
     let text: String
+    let severity: AgentMessageSeverity
     let action: BannerAction?
     let secondaryAction: BannerAction?
 
@@ -30,8 +31,14 @@ struct ReaderBannerMessage {
         let handler: () -> Void
     }
 
-    init(text: String, action: BannerAction? = nil, secondaryAction: BannerAction? = nil) {
+    init(
+        text: String,
+        severity: AgentMessageSeverity = .warning,
+        action: BannerAction? = nil,
+        secondaryAction: BannerAction? = nil
+    ) {
         self.text = text
+        self.severity = severity
         self.action = action
         self.secondaryAction = secondaryAction
     }

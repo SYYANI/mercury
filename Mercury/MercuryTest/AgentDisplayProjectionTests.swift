@@ -14,6 +14,168 @@ struct AgentRuntimeProjectionTests {
         fetchFailedRetry: "Retry"
     )
 
+    @Test("Reader-bound tasks use reader banner host")
+    func readerBoundTasksUseReaderBannerHost() {
+        #expect(AgentMessagePresentation.policy(for: .summary).primaryMessageHost == .readerTopBanner)
+        #expect(AgentMessagePresentation.policy(for: .translation).primaryMessageHost == .readerTopBanner)
+        #expect(AgentMessagePresentation.policy(for: .tagging).primaryMessageHost == .readerTopBanner)
+    }
+
+    @Test("Batch tagging uses sheet footer message area")
+    func batchTaggingUsesSheetFooterHost() {
+        let policy = AgentMessagePresentation.policy(for: .taggingBatch)
+        #expect(policy.primaryMessageHost == .batchSheetFooterMessageArea)
+        #expect(policy.allowsInlineNoticeDuringRun == true)
+    }
+
+    @Test("Reader banner arbitration drops incoming message for non-displayed entry")
+    func arbitrationDropsNonDisplayedEntry() {
+        let current = makeCandidate(
+            taskKind: .summary,
+            entryId: 7,
+            requestSource: .manual,
+            createdAt: Date(timeIntervalSinceReferenceDate: 10),
+            text: "Current"
+        )
+        let incoming = makeCandidate(
+            taskKind: .translation,
+            entryId: 8,
+            requestSource: .manual,
+            createdAt: Date(timeIntervalSinceReferenceDate: 20),
+            text: "Incoming"
+        )
+
+        let winner = AgentMessagePresentation.arbitrateReaderBanner(
+            current: current,
+            incoming: incoming,
+            displayedEntryId: 7
+        )
+        #expect(winner == current)
+    }
+
+    @Test("Reader banner arbitration prefers manual over automatic messages")
+    func arbitrationPrefersManual() {
+        let current = makeCandidate(
+            taskKind: .summary,
+            entryId: 7,
+            requestSource: .auto,
+            createdAt: Date(timeIntervalSinceReferenceDate: 10),
+            text: "Auto"
+        )
+        let incoming = makeCandidate(
+            taskKind: .translation,
+            entryId: 7,
+            requestSource: .manual,
+            createdAt: Date(timeIntervalSinceReferenceDate: 5),
+            text: "Manual"
+        )
+
+        let winner = AgentMessagePresentation.arbitrateReaderBanner(
+            current: current,
+            incoming: incoming,
+            displayedEntryId: 7
+        )
+        #expect(winner == incoming)
+    }
+
+    @Test("Reader banner arbitration prefers messages with actions")
+    func arbitrationPrefersActions() {
+        let current = makeCandidate(
+            taskKind: .summary,
+            entryId: 7,
+            requestSource: .manual,
+            createdAt: Date(timeIntervalSinceReferenceDate: 10),
+            text: "No Action"
+        )
+        let incoming = makeCandidate(
+            taskKind: .translation,
+            entryId: 7,
+            requestSource: .manual,
+            createdAt: Date(timeIntervalSinceReferenceDate: 5),
+            text: "Has Action",
+            primaryAction: AgentProjectedMessageAction(id: .openSettings, label: "Open Settings")
+        )
+
+        let winner = AgentMessagePresentation.arbitrateReaderBanner(
+            current: current,
+            incoming: incoming,
+            displayedEntryId: 7
+        )
+        #expect(winner == incoming)
+    }
+
+    @Test("Reader banner arbitration prefers newer message when priorities tie")
+    func arbitrationPrefersNewerWhenPriorityTies() {
+        let current = makeCandidate(
+            taskKind: .summary,
+            entryId: 7,
+            requestSource: .manual,
+            createdAt: Date(timeIntervalSinceReferenceDate: 10),
+            text: "Older"
+        )
+        let incoming = makeCandidate(
+            taskKind: .translation,
+            entryId: 7,
+            requestSource: .manual,
+            createdAt: Date(timeIntervalSinceReferenceDate: 20),
+            text: "Newer"
+        )
+
+        let winner = AgentMessagePresentation.arbitrateReaderBanner(
+            current: current,
+            incoming: incoming,
+            displayedEntryId: 7
+        )
+        #expect(winner == incoming)
+    }
+
+    @Test("Legacy reader banner bridges to shared host model")
+    func legacyReaderBannerBridgesToSharedHostModel() {
+        let banner = ReaderBannerMessage(
+            text: "Need attention",
+            severity: .error,
+            action: .init(label: "Open Settings", handler: {}),
+            secondaryAction: .init(label: "Open Debug View", handler: {})
+        )
+
+        let model = AgentMessageHostAdapter.readerBannerModel(from: banner)
+        #expect(model?.primaryText == "Need attention")
+        #expect(model?.severity == .error)
+        #expect(model?.primaryActionLabel == "Open Settings")
+        #expect(model?.secondaryActionLabel == "Open Debug View")
+    }
+
+    @Test("Projected batch footer message bridges to shared host model")
+    func projectedBatchFooterBridgesToSharedHostModel() {
+        let projected = AgentProjectedMessage(
+            primaryText: "Batch warning",
+            secondaryText: "Check scope before continuing.",
+            severity: .warning,
+            primaryAction: nil,
+            secondaryAction: nil,
+            host: .batchSheetFooterMessageArea
+        )
+
+        let model = AgentMessageHostAdapter.batchSheetFooterModel(from: projected)
+        #expect(model?.primaryText == "Batch warning")
+        #expect(model?.secondaryText == "Check scope before continuing.")
+        #expect(model?.severity == .warning)
+    }
+
+    @Test("Projected host adapter rejects mismatched host")
+    func projectedHostAdapterRejectsMismatchedHost() {
+        let projected = AgentProjectedMessage(
+            primaryText: "Reader only",
+            secondaryText: nil,
+            severity: .info,
+            primaryAction: nil,
+            secondaryAction: nil,
+            host: .readerTopBanner
+        )
+
+        #expect(AgentMessageHostAdapter.batchSheetFooterModel(from: projected) == nil)
+    }
+
     @Test("Content suppresses placeholder regardless of other flags")
     func contentWins() {
         let text = AgentRuntimeProjection.placeholderText(
@@ -255,5 +417,28 @@ struct AgentRuntimeProjectionTests {
         }
         LanguageManager.shared.setLanguage("en")
         body()
+    }
+
+    private func makeCandidate(
+        taskKind: AgentTaskKind,
+        entryId: Int64,
+        requestSource: AgentTaskRequestSource,
+        createdAt: Date,
+        text: String,
+        primaryAction: AgentProjectedMessageAction? = nil
+    ) -> AgentProjectedMessageCandidate {
+        AgentProjectedMessageCandidate(
+            owner: AgentRunOwner(taskKind: taskKind, entryId: entryId, slotKey: "slot"),
+            requestSource: requestSource,
+            createdAt: createdAt,
+            message: AgentProjectedMessage(
+                primaryText: text,
+                secondaryText: nil,
+                severity: .info,
+                primaryAction: primaryAction,
+                secondaryAction: nil,
+                host: .readerTopBanner
+            )
+        )
     }
 }

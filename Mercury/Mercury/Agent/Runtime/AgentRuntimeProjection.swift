@@ -1,5 +1,223 @@
 import Foundation
 
+nonisolated enum AgentMessageHost: String, Equatable, Sendable {
+    case readerTopBanner
+    case batchSheetFooterMessageArea
+    case inlinePanelStatus
+    case modalAlert
+}
+
+nonisolated enum AgentMessageSeverity: String, Equatable, Sendable {
+    case info
+    case success
+    case warning
+    case error
+}
+
+nonisolated enum AgentProjectedMessageActionID: String, Equatable, Sendable {
+    case openSettings
+    case openDebugIssues
+}
+
+nonisolated struct AgentProjectedMessageAction: Equatable, Sendable {
+    let id: AgentProjectedMessageActionID
+    let label: String
+}
+
+nonisolated struct AgentProjectedMessage: Equatable, Sendable {
+    let primaryText: String
+    let secondaryText: String?
+    let severity: AgentMessageSeverity
+    let primaryAction: AgentProjectedMessageAction?
+    let secondaryAction: AgentProjectedMessageAction?
+    let host: AgentMessageHost
+
+    var hasActions: Bool {
+        primaryAction != nil || secondaryAction != nil
+    }
+}
+
+nonisolated struct AgentHostRenderedMessageModel: Equatable, Sendable {
+    let primaryText: String
+    let secondaryText: String?
+    let severity: AgentMessageSeverity
+    let primaryActionLabel: String?
+    let secondaryActionLabel: String?
+
+    var hasActions: Bool {
+        primaryActionLabel != nil || secondaryActionLabel != nil
+    }
+}
+
+nonisolated enum AgentMessageHostAdapter {
+    static func readerBannerModel(from message: ReaderBannerMessage?) -> AgentHostRenderedMessageModel? {
+        guard let message else {
+            return nil
+        }
+
+        return makeModel(
+            primaryText: message.text,
+            secondaryText: nil,
+            severity: message.severity,
+            primaryActionLabel: message.action?.label,
+            secondaryActionLabel: message.secondaryAction?.label
+        )
+    }
+
+    static func readerBannerModel(from message: AgentProjectedMessage?) -> AgentHostRenderedMessageModel? {
+        guard let message, message.host == .readerTopBanner else {
+            return nil
+        }
+
+        return makeModel(
+            primaryText: message.primaryText,
+            secondaryText: message.secondaryText,
+            severity: message.severity,
+            primaryActionLabel: message.primaryAction?.label,
+            secondaryActionLabel: message.secondaryAction?.label
+        )
+    }
+
+    static func batchSheetFooterModel(from message: AgentProjectedMessage?) -> AgentHostRenderedMessageModel? {
+        guard let message, message.host == .batchSheetFooterMessageArea else {
+            return nil
+        }
+
+        return makeModel(
+            primaryText: message.primaryText,
+            secondaryText: message.secondaryText,
+            severity: message.severity,
+            primaryActionLabel: message.primaryAction?.label,
+            secondaryActionLabel: message.secondaryAction?.label
+        )
+    }
+
+    private static func makeModel(
+        primaryText: String,
+        secondaryText: String?,
+        severity: AgentMessageSeverity,
+        primaryActionLabel: String?,
+        secondaryActionLabel: String?
+    ) -> AgentHostRenderedMessageModel? {
+        let normalizedPrimary = normalize(primaryText)
+        let normalizedSecondary = normalize(secondaryText)
+
+        guard let normalizedPrimary else {
+            return nil
+        }
+
+        return AgentHostRenderedMessageModel(
+            primaryText: normalizedPrimary,
+            secondaryText: normalizedSecondary,
+            severity: severity,
+            primaryActionLabel: normalize(primaryActionLabel),
+            secondaryActionLabel: normalize(secondaryActionLabel)
+        )
+    }
+
+    private static func normalize(_ text: String?) -> String? {
+        guard let text else {
+            return nil
+        }
+
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
+nonisolated struct AgentTaskPresentationPolicy: Equatable, Sendable {
+    let taskKind: AgentTaskKind
+    let primaryMessageHost: AgentMessageHost
+    let allowsInlineNoticeDuringRun: Bool
+    let allowsTerminalMessage: Bool
+    let allowsActionLinks: Bool
+}
+
+nonisolated struct AgentProjectedMessageCandidate: Equatable, Sendable {
+    let owner: AgentRunOwner
+    let requestSource: AgentTaskRequestSource
+    let createdAt: Date
+    let message: AgentProjectedMessage
+}
+
+nonisolated enum AgentMessagePresentation {
+    static func policy(for taskKind: AgentTaskKind) -> AgentTaskPresentationPolicy {
+        switch taskKind {
+        case .summary, .translation, .tagging:
+            return AgentTaskPresentationPolicy(
+                taskKind: taskKind,
+                primaryMessageHost: .readerTopBanner,
+                allowsInlineNoticeDuringRun: false,
+                allowsTerminalMessage: true,
+                allowsActionLinks: true
+            )
+        case .taggingBatch:
+            return AgentTaskPresentationPolicy(
+                taskKind: taskKind,
+                primaryMessageHost: .batchSheetFooterMessageArea,
+                allowsInlineNoticeDuringRun: true,
+                allowsTerminalMessage: true,
+                allowsActionLinks: true
+            )
+        }
+    }
+
+    static func arbitrateReaderBanner(
+        current: AgentProjectedMessageCandidate?,
+        incoming: AgentProjectedMessageCandidate?,
+        displayedEntryId: Int64?
+    ) -> AgentProjectedMessageCandidate? {
+        guard let displayedEntryId else {
+            return nil
+        }
+
+        let eligibleCurrent = current.flatMap {
+            isEligibleReaderBannerCandidate($0, displayedEntryId: displayedEntryId) ? $0 : nil
+        }
+        let eligibleIncoming = incoming.flatMap {
+            isEligibleReaderBannerCandidate($0, displayedEntryId: displayedEntryId) ? $0 : nil
+        }
+
+        switch (eligibleCurrent, eligibleIncoming) {
+        case (nil, nil):
+            return nil
+        case let (current?, nil):
+            return current
+        case let (nil, incoming?):
+            return incoming
+        case let (current?, incoming?):
+            return preferredReaderBannerCandidate(current: current, incoming: incoming)
+        }
+    }
+
+    private static func isEligibleReaderBannerCandidate(
+        _ candidate: AgentProjectedMessageCandidate,
+        displayedEntryId: Int64
+    ) -> Bool {
+        candidate.message.host == .readerTopBanner && candidate.owner.entryId == displayedEntryId
+    }
+
+    private static func preferredReaderBannerCandidate(
+        current: AgentProjectedMessageCandidate,
+        incoming: AgentProjectedMessageCandidate
+    ) -> AgentProjectedMessageCandidate {
+        let currentRank = priorityRank(for: current)
+        let incomingRank = priorityRank(for: incoming)
+
+        if incomingRank != currentRank {
+            return incomingRank > currentRank ? incoming : current
+        }
+
+        return incoming.createdAt >= current.createdAt ? incoming : current
+    }
+
+    private static func priorityRank(for candidate: AgentProjectedMessageCandidate) -> Int {
+        let manualBoost = candidate.requestSource == .manual ? 2 : 0
+        let actionBoost = candidate.message.hasActions ? 1 : 0
+        return manualBoost + actionBoost
+    }
+}
+
 nonisolated struct AgentRuntimeDisplayStrings: Equatable, Sendable {
     let noContent: String
     let loading: String

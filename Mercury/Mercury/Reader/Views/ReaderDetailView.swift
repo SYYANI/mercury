@@ -158,8 +158,13 @@ struct ReaderDetailView: View {
 
         VStack(spacing: 0) {
             if let topBannerMessage,
-               topBannerMessage.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
-                topErrorBanner(topBannerMessage)
+               let bannerModel = AgentMessageHostAdapter.readerBannerModel(from: topBannerMessage) {
+                AgentReaderBannerHostView(
+                    message: bannerModel,
+                    onPrimaryAction: topBannerMessage.action?.handler,
+                    onSecondaryAction: topBannerMessage.secondaryAction?.handler,
+                    onDismiss: { self.topBannerMessage = nil }
+                )
                     .padding(.horizontal, 12)
                     .padding(.top, 10)
                     .padding(.bottom, 8)
@@ -211,41 +216,6 @@ struct ReaderDetailView: View {
             await loadEntryTags()
             await loadRelatedEntries(for: entry.id)
         }
-    }
-
-    // MARK: - Status Banner
-
-    private func topErrorBanner(_ banner: ReaderBannerMessage) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.yellow)
-            Text(banner.text)
-                .font(.subheadline)
-                .lineLimit(2)
-                .textSelection(.enabled)
-            Spacer(minLength: 0)
-            if let secondaryAction = banner.secondaryAction {
-                Button(secondaryAction.label, action: secondaryAction.handler)
-                    .buttonStyle(.link)
-                    .font(.subheadline)
-            }
-            if let action = banner.action {
-                Button(action.label, action: action.handler)
-                    .buttonStyle(.link)
-                    .font(.subheadline)
-            }
-            Button {
-                topBannerMessage = nil
-            } label: {
-                Image(systemName: "xmark")
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(Color(nsColor: .controlBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
     // MARK: - Empty States

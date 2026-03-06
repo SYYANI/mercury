@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import Mercury
 
-@Suite("Tag Batch Event Stream")
+@Suite("Tag Batch Event Stream", .serialized)
 struct TagBatchEventStreamTests {
     @Test("Entering review broadcasts a review transition")
     @MainActor

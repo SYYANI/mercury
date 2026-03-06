@@ -353,6 +353,7 @@ final class BatchTaggingSheetViewModel: ObservableObject {
             self.status = status
             if status != .running {
                 isStopRequested = false
+                clearTransitionScopedNotice(for: status)
             }
             if status == .done {
                 await restoreRunState(runId: runId)
@@ -406,6 +407,17 @@ final class BatchTaggingSheetViewModel: ObservableObject {
 
     private func shouldHandle(runId: Int64) -> Bool {
         self.runId == nil || self.runId == runId
+    }
+
+    private func clearTransitionScopedNotice(for status: TagBatchRunStatus) {
+        switch status {
+        case .readyNext, .review, .done, .cancelled, .failed, .configure:
+            if notice == .stopRequested {
+                notice = nil
+            }
+        case .running, .applying:
+            break
+        }
     }
 
     private func restoreRunState(runId: Int64) async {

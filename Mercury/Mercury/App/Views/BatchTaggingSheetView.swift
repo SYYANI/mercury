@@ -10,6 +10,9 @@ struct BatchTaggingSheetView: View {
     @State private var isStartConfirmPresented = false
     @State private var isCompletionAlertPresented = false
     @State private var lastCompletionAlertRunId: Int64?
+    @State private var footerWidth: CGFloat = 0
+    @State private var footerLeadingWidth: CGFloat = 0
+    @State private var footerTrailingWidth: CGFloat = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -202,17 +205,6 @@ struct BatchTaggingSheetView: View {
                     .foregroundStyle(ViewSemanticStyle.errorColor)
                 }
 
-                if let error = viewModel.error {
-                    Text(errorText(error))
-                        .font(.footnote)
-                        .foregroundStyle(ViewSemanticStyle.errorColor)
-                }
-
-                if let notice = viewModel.notice, viewModel.exceedsHardSafetyCap == false {
-                    Text(noticeText(notice))
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
             }
 
             Spacer()
@@ -236,12 +228,6 @@ struct BatchTaggingSheetView: View {
             }
             .font(.footnote)
             .foregroundStyle(.secondary)
-
-            if let notice = viewModel.notice {
-                Text(noticeText(notice))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
 
             Spacer()
         }
@@ -314,12 +300,6 @@ struct BatchTaggingSheetView: View {
                 }
                 .padding(.vertical, 2)
             }
-
-            if let error = viewModel.error {
-                Text(errorText(error))
-                    .font(.footnote)
-                    .foregroundStyle(ViewSemanticStyle.errorColor)
-            }
         }
     }
 
@@ -339,6 +319,69 @@ struct BatchTaggingSheetView: View {
 
     private var footer: some View {
         HStack(spacing: 10) {
+            footerLeadingActions
+                .background(widthReader(BatchFooterMeasuredRegion.leading))
+
+            Spacer()
+
+            footerTrailingActions
+                .background(widthReader(BatchFooterMeasuredRegion.trailing))
+        }
+        .background(widthReader(BatchFooterMeasuredRegion.total))
+        .overlay(alignment: .center) {
+            if let footerMessage = footerMessageModel,
+               footerMessageAvailableWidth > 0 {
+                AgentBatchSheetFooterMessageView(
+                    message: footerMessage,
+                    onPrimaryAction: nil,
+                    onSecondaryAction: nil
+                )
+                .frame(maxWidth: footerMessageAvailableWidth)
+                .allowsHitTesting(false)
+            }
+        }
+        .onPreferenceChange(BatchFooterWidthPreferenceKey.self, perform: updateMeasuredWidths)
+    }
+
+    private var footerMessageAvailableWidth: CGFloat {
+        max(0, footerWidth - footerLeadingWidth - footerTrailingWidth - 48)
+    }
+
+    private var progressValue: Double {
+        guard viewModel.totalCandidateCount > 0 else { return 0 }
+        return min(max(Double(viewModel.processedCount) / Double(viewModel.totalCandidateCount), 0), 1)
+    }
+
+    private var statusLabel: String {
+        switch viewModel.status {
+        case .configure:
+            return String(localized: "Configure", bundle: bundle)
+        case .running:
+            return String(localized: "Running", bundle: bundle)
+        case .readyNext:
+            return String(localized: "Ready", bundle: bundle)
+        case .review:
+            return String(localized: "Review", bundle: bundle)
+        case .applying:
+            return String(localized: "Applying", bundle: bundle)
+        case .done:
+            return String(localized: "Done", bundle: bundle)
+        case .cancelled:
+            return String(localized: "Cancelled", bundle: bundle)
+        case .failed:
+            return String(localized: "Failed", bundle: bundle)
+        }
+    }
+
+    private var completionSummaryText: String {
+        String(
+            localized: "Batch apply completed. Processed \(viewModel.processedCount), succeeded \(viewModel.succeededCount), failed \(viewModel.failedCount), inserted assignments \(viewModel.insertedEntryTagCount), created tags \(viewModel.createdTagCount), kept proposals \(viewModel.keptProposalCount), discarded proposals \(viewModel.discardedProposalCount).",
+            bundle: bundle
+        )
+    }
+
+    private var footerLeadingActions: some View {
+        Group {
             if viewModel.isLifecycleLocked {
                 Button(role: .destructive) {
                     isDiscardConfirmPresented = true
@@ -354,9 +397,11 @@ struct BatchTaggingSheetView: View {
                     Text("Close", bundle: bundle)
                 }
             }
+        }
+    }
 
-            Spacer()
-
+    private var footerTrailingActions: some View {
+        HStack(spacing: 10) {
             if viewModel.status == .review {
                 if viewModel.reviewRows.isEmpty == false {
                     Button {
@@ -434,37 +479,68 @@ struct BatchTaggingSheetView: View {
         }
     }
 
-    private var progressValue: Double {
-        guard viewModel.totalCandidateCount > 0 else { return 0 }
-        return min(max(Double(viewModel.processedCount) / Double(viewModel.totalCandidateCount), 0), 1)
-    }
-
-    private var statusLabel: String {
-        switch viewModel.status {
-        case .configure:
-            return String(localized: "Configure", bundle: bundle)
-        case .running:
-            return String(localized: "Running", bundle: bundle)
-        case .readyNext:
-            return String(localized: "Ready", bundle: bundle)
-        case .review:
-            return String(localized: "Review", bundle: bundle)
-        case .applying:
-            return String(localized: "Applying", bundle: bundle)
-        case .done:
-            return String(localized: "Done", bundle: bundle)
-        case .cancelled:
-            return String(localized: "Cancelled", bundle: bundle)
-        case .failed:
-            return String(localized: "Failed", bundle: bundle)
+    @ViewBuilder
+    private func widthReader(_ region: BatchFooterMeasuredRegion) -> some View {
+        GeometryReader { proxy in
+            Color.clear
+                .preference(
+                    key: BatchFooterWidthPreferenceKey.self,
+                    value: [region: proxy.size.width]
+                )
         }
     }
 
-    private var completionSummaryText: String {
-        String(
-            localized: "Batch apply completed. Processed \(viewModel.processedCount), succeeded \(viewModel.succeededCount), failed \(viewModel.failedCount), inserted assignments \(viewModel.insertedEntryTagCount), created tags \(viewModel.createdTagCount), kept proposals \(viewModel.keptProposalCount), discarded proposals \(viewModel.discardedProposalCount).",
-            bundle: bundle
+    private func updateMeasuredWidths(_ values: [BatchFooterMeasuredRegion: CGFloat]) {
+        if let width = values[.total] {
+            footerWidth = width
+        }
+        if let width = values[.leading] {
+            footerLeadingWidth = width
+        }
+        if let width = values[.trailing] {
+            footerTrailingWidth = width
+        }
+    }
+
+    private var footerMessageModel: AgentHostRenderedMessageModel? {
+        AgentMessageHostAdapter.batchSheetFooterModel(from: footerProjectedMessage)
+    }
+
+    private var footerProjectedMessage: AgentProjectedMessage? {
+        if let error = viewModel.error {
+            return AgentProjectedMessage(
+                primaryText: errorText(error),
+                secondaryText: nil,
+                severity: .error,
+                primaryAction: nil,
+                secondaryAction: nil,
+                host: .batchSheetFooterMessageArea
+            )
+        }
+
+        guard let notice = viewModel.notice else {
+            return nil
+        }
+
+        return AgentProjectedMessage(
+            primaryText: noticeText(notice),
+            secondaryText: nil,
+            severity: footerSeverity(for: notice),
+            primaryAction: nil,
+            secondaryAction: nil,
+            host: .batchSheetFooterMessageArea
         )
+    }
+
+    private func footerSeverity(for notice: BatchTaggingSheetNotice) -> AgentMessageSeverity {
+        switch notice {
+        case .promptTemplateFallback, .activeRunExists, .stopBeforeAbort:
+            return .warning
+        case .hardSafetyCapExceeded:
+            return .error
+        case .noEligibleEntries, .stopRequested:
+            return .info
+        }
     }
 
     private func noticeText(_ notice: BatchTaggingSheetNotice) -> String {
@@ -516,5 +592,22 @@ struct BatchTaggingSheetView: View {
         case .operationFailed(let reason):
             return AgentRuntimeProjection.failureMessage(for: reason, taskKind: .taggingBatch)
         }
+    }
+}
+
+private enum BatchFooterMeasuredRegion: Hashable {
+    case total
+    case leading
+    case trailing
+}
+
+private struct BatchFooterWidthPreferenceKey: PreferenceKey {
+    static var defaultValue: [BatchFooterMeasuredRegion: CGFloat] = [:]
+
+    static func reduce(
+        value: inout [BatchFooterMeasuredRegion: CGFloat],
+        nextValue: () -> [BatchFooterMeasuredRegion: CGFloat]
+    ) {
+        value.merge(nextValue(), uniquingKeysWith: { _, new in new })
     }
 }
