@@ -21,6 +21,27 @@ enum TagBatchSelectionScope: String, CaseIterable, Identifiable, Sendable {
     var id: String { rawValue }
 }
 
+extension TagBatchSelectionScope {
+    func displayTitle(bundle: Bundle) -> String {
+        switch self {
+        case .pastWeek:
+            return String(localized: "1 week", bundle: bundle)
+        case .pastMonth:
+            return String(localized: "1 month", bundle: bundle)
+        case .pastThreeMonths:
+            return String(localized: "3 months", bundle: bundle)
+        case .pastSixMonths:
+            return String(localized: "6 months", bundle: bundle)
+        case .pastTwelveMonths:
+            return String(localized: "12 months", bundle: bundle)
+        case .allEntries:
+            return String(localized: "All", bundle: bundle)
+        case .unreadEntries:
+            return String(localized: "All unread", bundle: bundle)
+        }
+    }
+}
+
 private struct TagBatchSelectionCriteria: Sendable {
     let scope: TagBatchSelectionScope
     let skipAlreadyApplied: Bool

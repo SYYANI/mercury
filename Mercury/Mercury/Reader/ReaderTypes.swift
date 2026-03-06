@@ -47,9 +47,14 @@ struct ReaderBannerMessage {
 extension ReaderBannerMessage.BannerAction {
     /// Returns an action that opens the Debug Issues panel in debug builds,
     /// and `nil` in release builds so no button is rendered.
-    static var openDebugIssues: ReaderBannerMessage.BannerAction? {
+    @MainActor static var openDebugIssues: ReaderBannerMessage.BannerAction? {
         #if DEBUG
-        return ReaderBannerMessage.BannerAction(label: "Open Debug View") {
+        return ReaderBannerMessage.BannerAction(
+            label: AgentRuntimeProjection.actionLabel(
+                for: .openDebugIssues,
+                bundle: LanguageManager.shared.bundle
+            )
+        ) {
             NotificationCenter.default.post(name: .openDebugIssuesRequested, object: nil)
         }
         #else

@@ -96,7 +96,7 @@ struct BatchTaggingSheetView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Batch Tagging", bundle: bundle)
                     .font(.title3.weight(.semibold))
-                Text(statusLabel)
+                Text(viewModel.status.displayTitle(bundle: bundle))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -130,13 +130,9 @@ struct BatchTaggingSheetView: View {
                 HStack(spacing: 8) {
                     Text("Tagging entries", bundle: bundle)
                     Picker(selection: $viewModel.scope) {
-                        Text("1 week", bundle: bundle).tag(TagBatchSelectionScope.pastWeek)
-                        Text("1 month", bundle: bundle).tag(TagBatchSelectionScope.pastMonth)
-                        Text("3 months", bundle: bundle).tag(TagBatchSelectionScope.pastThreeMonths)
-                        Text("6 months", bundle: bundle).tag(TagBatchSelectionScope.pastSixMonths)
-                        Text("12 months", bundle: bundle).tag(TagBatchSelectionScope.pastTwelveMonths)
-                        Text("All unread", bundle: bundle).tag(TagBatchSelectionScope.unreadEntries)
-                        Text("All", bundle: bundle).tag(TagBatchSelectionScope.allEntries)
+                        ForEach(TagBatchSelectionScope.allCases) { scope in
+                            Text(scope.displayTitle(bundle: bundle)).tag(scope)
+                        }
                     } label: {
                         Text("Tagging entries", bundle: bundle)
                     }
@@ -350,27 +346,6 @@ struct BatchTaggingSheetView: View {
     private var progressValue: Double {
         guard viewModel.totalCandidateCount > 0 else { return 0 }
         return min(max(Double(viewModel.processedCount) / Double(viewModel.totalCandidateCount), 0), 1)
-    }
-
-    private var statusLabel: String {
-        switch viewModel.status {
-        case .configure:
-            return String(localized: "Configure", bundle: bundle)
-        case .running:
-            return String(localized: "Running", bundle: bundle)
-        case .readyNext:
-            return String(localized: "Ready", bundle: bundle)
-        case .review:
-            return String(localized: "Review", bundle: bundle)
-        case .applying:
-            return String(localized: "Applying", bundle: bundle)
-        case .done:
-            return String(localized: "Done", bundle: bundle)
-        case .cancelled:
-            return String(localized: "Cancelled", bundle: bundle)
-        case .failed:
-            return String(localized: "Failed", bundle: bundle)
-        }
     }
 
     private var completionSummaryText: String {

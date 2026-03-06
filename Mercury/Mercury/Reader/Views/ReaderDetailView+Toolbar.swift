@@ -126,7 +126,7 @@ extension ReaderDetailView {
         }
         if translationMode == .original,
            hasResumableTranslationCheckpointForCurrentSlot {
-            return String(localized: "Resume Translation", bundle: bundle)
+            return AgentRuntimeProjection.actionLabel(for: .resumeTranslation, bundle: bundle)
         }
         if translationMode == .original {
             return String(localized: "Switch to Translation", bundle: bundle)

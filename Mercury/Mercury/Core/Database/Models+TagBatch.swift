@@ -34,6 +34,27 @@ extension TagBatchRunStatus {
     var blocksDestructiveTagMutation: Bool {
         isActiveLifecycle
     }
+
+    func displayTitle(bundle: Bundle) -> String {
+        switch self {
+        case .configure:
+            return String(localized: "Configure", bundle: bundle)
+        case .running:
+            return String(localized: "Running", bundle: bundle)
+        case .readyNext:
+            return String(localized: "Ready", bundle: bundle)
+        case .review:
+            return String(localized: "Review", bundle: bundle)
+        case .applying:
+            return String(localized: "Applying", bundle: bundle)
+        case .done:
+            return String(localized: "Done", bundle: bundle)
+        case .cancelled:
+            return String(localized: "Cancelled", bundle: bundle)
+        case .failed:
+            return String(localized: "Failed", bundle: bundle)
+        }
+    }
 }
 
 enum TagBatchEntryLifecycleState: String, Codable, CaseIterable, Sendable {

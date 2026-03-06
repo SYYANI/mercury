@@ -282,9 +282,7 @@ nonisolated struct AgentRuntimeStatusProjection: Equatable, Sendable {
 }
 
 nonisolated enum AgentRuntimeProjection {
-    @MainActor private static func actionLabel(for id: AgentProjectedMessageActionID) -> String {
-        let bundle = LanguageManager.shared.bundle
-
+    static func actionLabel(for id: AgentProjectedMessageActionID, bundle: Bundle) -> String {
         switch id {
         case .openSettings:
             return String(localized: "Open Settings", bundle: bundle)
@@ -298,7 +296,10 @@ nonisolated enum AgentRuntimeProjection {
     }
 
     @MainActor private static func action(_ id: AgentProjectedMessageActionID) -> AgentProjectedMessageAction {
-        AgentProjectedMessageAction(id: id, label: actionLabel(for: id))
+        AgentProjectedMessageAction(
+            id: id,
+            label: actionLabel(for: id, bundle: LanguageManager.shared.bundle)
+        )
     }
 
     @MainActor private static func readerBannerProjectedMessage(

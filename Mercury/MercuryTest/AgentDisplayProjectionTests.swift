@@ -266,6 +266,18 @@ struct AgentRuntimeProjectionTests {
         }
     }
 
+    @Test("Projected action labels remain shared")
+    @MainActor func projectedActionLabelsRemainShared() {
+        withEnglishLanguage {
+            let bundle = LanguageManager.shared.bundle
+
+            #expect(AgentRuntimeProjection.actionLabel(for: .openSettings, bundle: bundle) == "Open Settings")
+            #expect(AgentRuntimeProjection.actionLabel(for: .openDebugIssues, bundle: bundle) == "Open Debug View")
+            #expect(AgentRuntimeProjection.actionLabel(for: .resumeTranslation, bundle: bundle) == "Resume Translation")
+            #expect(AgentRuntimeProjection.actionLabel(for: .retryFailedSegments, bundle: bundle) == "Retry failed segments")
+        }
+    }
+
     @Test("Batch notice projected message uses footer host and warning severity")
     @MainActor func batchNoticeProjectedMessageUsesFooterHost() {
         withEnglishLanguage {
