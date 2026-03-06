@@ -176,6 +176,22 @@ struct AgentRuntimeProjectionTests {
         #expect(AgentMessageHostAdapter.batchSheetFooterModel(from: projected) == nil)
     }
 
+    @Test("Summary typed notice projects shared prompt fallback message")
+    @MainActor func summaryTypedNoticeProjectsPromptFallbackMessage() {
+        withEnglishLanguage {
+            let message = AgentRuntimeProjection.summaryNoticeMessage(.promptTemplateFallback)
+            #expect(message == "Custom Summary prompt is invalid. Using built-in prompt.")
+        }
+    }
+
+    @Test("Translation typed notice projects shared prompt fallback message")
+    @MainActor func translationTypedNoticeProjectsPromptFallbackMessage() {
+        withEnglishLanguage {
+            let message = AgentRuntimeProjection.translationNoticeMessage(.promptTemplateFallback)
+            #expect(message == "Custom Translation prompt is invalid. Using built-in prompt.")
+        }
+    }
+
     @Test("Content suppresses placeholder regardless of other flags")
     func contentWins() {
         let text = AgentRuntimeProjection.placeholderText(

@@ -135,11 +135,11 @@ extension ReaderTranslationView {
                     refreshRunningStateForCurrentEntry()
                 }
             }
-        case .notice(let message):
-            translationNoticeByOwner[request.owner] = message
+        case .notice(let notice):
+            translationNoticeByOwner[request.owner] = notice
             if request.owner.entryId == displayedEntryId {
                 topBannerMessage = ReaderBannerMessage(
-                    text: message,
+                    text: AgentRuntimeProjection.translationNoticeMessage(notice),
                     secondaryAction: .openDebugIssues
                 )
             }
@@ -217,8 +217,8 @@ extension ReaderTranslationView {
                             taskKind: .translation
                         ) ?? AgentRuntimeProjection.failureMessage(for: .unknown, taskKind: .translation)
                         let bannerText: String
-                        if let notice, notice.isEmpty == false {
-                            bannerText = "\(notice) \(failureText)"
+                        if let notice {
+                            bannerText = "\(AgentRuntimeProjection.translationNoticeMessage(notice)) \(failureText)"
                         } else {
                             bannerText = failureText
                         }

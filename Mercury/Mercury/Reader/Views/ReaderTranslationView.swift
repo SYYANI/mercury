@@ -86,7 +86,7 @@ struct ReaderTranslationView: View {
     @State var translationProjectionStateByOwner: [AgentRunOwner: TranslationProjectionState] = [:]
     @State var translationRetryMergeContextByOwner: [AgentRunOwner: TranslationRetryMergeContext] = [:]
     @State var translationPhaseByOwner: [AgentRunOwner: AgentRunPhase] = [:]
-    @State var translationNoticeByOwner: [AgentRunOwner: String] = [:]
+    @State var translationNoticeByOwner: [AgentRunOwner: TranslationRunNotice] = [:]
     @State var translationProjectionDebounceTask: Task<Void, Never>?
 
     var body: some View {

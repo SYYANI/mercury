@@ -7,9 +7,13 @@ struct TranslationRunRequest: Sendable {
     let sourceSnapshot: TranslationSourceSegmentsSnapshot
 }
 
+enum TranslationRunNotice: Sendable, Equatable {
+    case promptTemplateFallback
+}
+
 enum TranslationRunEvent: Sendable {
     case started(UUID)
-    case notice(String)
+    case notice(TranslationRunNotice)
     case segmentCompleted(sourceSegmentId: String, translatedText: String)
     case token(String)
     case persisting
@@ -191,7 +195,9 @@ extension AppModel {
             var loadedTemplateVersion = "unknown"
             var checkpointTaskRunIdForFailureHandling: Int64?
             do {
-                let template = try await loadPromptTemplate(config: .translation) { await onEvent(.notice($0)) }
+                let template = try await loadPromptTemplate(config: .translation) { _ in
+                    await onEvent(.notice(.promptTemplateFallback))
+                }
                 loadedTemplateId = template.id
                 loadedTemplateVersion = template.version
 

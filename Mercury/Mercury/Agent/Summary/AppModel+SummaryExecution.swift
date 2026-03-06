@@ -17,9 +17,13 @@ struct SummaryRunRequest: Sendable {
     let detailLevel: SummaryDetailLevel
 }
 
+enum SummaryRunNotice: Sendable, Equatable {
+    case promptTemplateFallback
+}
+
 enum SummaryRunEvent: Sendable {
     case started(UUID)
-    case notice(String)
+    case notice(SummaryRunNotice)
     case token(String)
     case terminal(TaskTerminalOutcome)
 }
@@ -74,7 +78,9 @@ extension AppModel {
 
             let startedAt = Date()
             do {
-                let template = try await loadPromptTemplate(config: .summary) { await onEvent(.notice($0)) }
+                let template = try await loadPromptTemplate(config: .summary) { _ in
+                    await onEvent(.notice(.promptTemplateFallback))
+                }
 
                 let success = try await runSummaryExecution(
                     request: SummaryRunRequest(

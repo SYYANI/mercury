@@ -281,6 +281,24 @@ nonisolated enum AgentRuntimeProjection {
         )
     }
 
+    @MainActor static func summaryNoticeMessage(_ notice: SummaryRunNotice) -> String {
+        switch notice {
+        case .promptTemplateFallback:
+            return AgentPromptCustomizationConfig.summary.invalidTemplateFallbackMessage(
+                bundle: LanguageManager.shared.bundle
+            )
+        }
+    }
+
+    @MainActor static func translationNoticeMessage(_ notice: TranslationRunNotice) -> String {
+        switch notice {
+        case .promptTemplateFallback:
+            return AgentPromptCustomizationConfig.translation.invalidTemplateFallbackMessage(
+                bundle: LanguageManager.shared.bundle
+            )
+        }
+    }
+
     @MainActor static func translationWaitingStatus() -> String {
         phaseDisplayStrings().waiting
     }

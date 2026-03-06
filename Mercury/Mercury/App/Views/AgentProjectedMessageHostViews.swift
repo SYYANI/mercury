@@ -13,6 +13,7 @@ struct AgentReaderBannerHostView: View {
             VStack(alignment: .leading, spacing: message.secondaryText == nil ? 0 : 2) {
                 Text(message.primaryText)
                     .font(.subheadline)
+                    .foregroundStyle(.primary)
                     .lineLimit(2)
                     .textSelection(.enabled)
                 if let secondaryText = message.secondaryText {
@@ -51,24 +52,24 @@ struct AgentReaderBannerHostView: View {
     private var iconName: String {
         switch message.severity {
         case .info:
-            return "info.circle.fill"
+            return "info.circle"
         case .success:
-            return "checkmark.circle.fill"
+            return "checkmark.circle"
         case .warning:
-            return "exclamationmark.triangle.fill"
+            return "exclamationmark.triangle"
         case .error:
-            return "xmark.octagon.fill"
+            return "xmark.octagon"
         }
     }
 
     private var iconColor: Color {
         switch message.severity {
         case .info:
-            return .accentColor
+            return .secondary
         case .success:
             return .green
         case .warning:
-            return .yellow
+            return ViewSemanticStyle.warningColor
         case .error:
             return ViewSemanticStyle.errorColor
         }
@@ -87,6 +88,7 @@ struct AgentBatchSheetFooterMessageView: View {
             VStack(alignment: .leading, spacing: message.secondaryText == nil ? 0 : 2) {
                 Text(message.primaryText)
                     .font(.footnote)
+                    .foregroundStyle(.primary)
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .textSelection(.enabled)
@@ -115,7 +117,6 @@ struct AgentBatchSheetFooterMessageView: View {
                     .font(.footnote)
             }
         }
-        .foregroundStyle(textColor)
         .frame(maxWidth: .infinity, alignment: .center)
     }
 
@@ -142,17 +143,6 @@ struct AgentBatchSheetFooterMessageView: View {
             return ViewSemanticStyle.warningColor
         case .error:
             return ViewSemanticStyle.errorColor
-        }
-    }
-
-    private var textColor: Color {
-        switch message.severity {
-        case .error:
-            return ViewSemanticStyle.errorColor
-        case .warning:
-            return ViewSemanticStyle.warningColor
-        case .info, .success:
-            return .secondary
         }
     }
 }

@@ -372,9 +372,9 @@ extension ReaderSummaryView {
                     activePhase: .generating
                 )
             }
-        case .notice(let message):
+        case .notice(let notice):
             topBannerMessage = ReaderBannerMessage(
-                text: message,
+                text: AgentRuntimeProjection.summaryNoticeMessage(notice),
                 secondaryAction: .openDebugIssues
             )
         case .token(let token):
