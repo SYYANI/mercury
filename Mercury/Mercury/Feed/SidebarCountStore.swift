@@ -123,14 +123,12 @@ final class SidebarCountStore: ObservableObject {
             )
         }
 
-        let visibleTags = SidebarTagVisibilityPolicy.visibleTags(from: allTagItems)
-
         return SidebarProjection(
             totalUnread: totalUnread,
             totalStarred: totalStarred,
             starredUnread: starredUnread,
             feedUnreadCounts: feedUnreadCounts,
-            tags: visibleTags
+            tags: allTagItems
         )
     }
 }

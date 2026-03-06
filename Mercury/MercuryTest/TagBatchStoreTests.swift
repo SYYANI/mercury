@@ -156,9 +156,109 @@ struct TagBatchStoreTests {
             let rows = try await store.loadReviewRows(runId: runId)
             #expect(rows.count == 1)
             #expect(rows.first?.normalizedName == "swift")
+            #expect(rows.first?.displayName == "Swift")
             #expect(rows.first?.hitCount == 2)
             #expect(rows.first?.sampleEntryCount == 2)
             #expect(rows.first?.decision == .pending)
+        }
+    }
+
+    @Test("Rebuild review rows groups by normalized name and keeps first display form")
+    @MainActor
+    func rebuildReviewRowsUsesNormalizedGrouping() async throws {
+        try await InMemoryDatabaseFixture.withFixture { fixture in
+            let db = fixture.database
+            let store = TagBatchStore(db: db)
+
+            let runId = try await store.createRun(
+                scopeLabel: "all_entries",
+                skipAlreadyApplied: false,
+                skipAlreadyTagged: false,
+                concurrency: 1,
+                totalSelectedEntries: 2,
+                totalPlannedEntries: 2
+            )
+
+            let entryIds = try await db.write { db in
+                var feed = Feed(
+                    id: nil,
+                    title: "Feed",
+                    feedURL: "https://example.com/rss",
+                    siteURL: "https://example.com",
+                    lastFetchedAt: nil,
+                    createdAt: Date()
+                )
+                try feed.insert(db)
+                let feedId = try #require(feed.id)
+
+                var first = Entry(
+                    id: nil,
+                    feedId: feedId,
+                    guid: "entry-a",
+                    url: "https://example.com/a",
+                    title: "A",
+                    author: nil,
+                    publishedAt: Date(),
+                    summary: "S1",
+                    isRead: false,
+                    isStarred: false,
+                    createdAt: Date()
+                )
+                try first.insert(db)
+
+                var second = Entry(
+                    id: nil,
+                    feedId: feedId,
+                    guid: "entry-b",
+                    url: "https://example.com/b",
+                    title: "B",
+                    author: nil,
+                    publishedAt: Date(),
+                    summary: "S2",
+                    isRead: false,
+                    isStarred: false,
+                    createdAt: Date()
+                )
+                try second.insert(db)
+
+                return [try #require(first.id), try #require(second.id)]
+            }
+
+            try await store.upsertAssignment(
+                TagBatchAssignmentStaging(
+                    id: nil,
+                    runId: runId,
+                    entryId: entryIds[0],
+                    normalizedName: "ios",
+                    displayName: "iOS",
+                    resolvedTagId: nil,
+                    assignmentKind: .newProposal,
+                    createdAt: Date(),
+                    updatedAt: Date()
+                )
+            )
+            try await store.upsertAssignment(
+                TagBatchAssignmentStaging(
+                    id: nil,
+                    runId: runId,
+                    entryId: entryIds[1],
+                    normalizedName: "ios",
+                    displayName: "IOS",
+                    resolvedTagId: nil,
+                    assignmentKind: .newProposal,
+                    createdAt: Date(),
+                    updatedAt: Date()
+                )
+            )
+
+            try await store.rebuildReviewRowsFromAssignments(runId: runId)
+
+            let rows = try await store.loadReviewRows(runId: runId)
+            #expect(rows.count == 1)
+            #expect(rows.first?.normalizedName == "ios")
+            #expect(rows.first?.displayName == "iOS")
+            #expect(rows.first?.hitCount == 2)
+            #expect(rows.first?.sampleEntryCount == 2)
         }
     }
 

@@ -115,14 +115,25 @@ struct TaggingExecutionTests {
         }
     }
 
-    @Test("Unmatched name is returned as a normalized new proposal")
+    @Test("Unmatched name keeps the original display casing for new proposals")
     @MainActor
-    func returnsNormalizedNewProposalForUnmatchedName() async throws {
+    func preservesOriginalDisplayNameForNewProposal() async throws {
         try await InMemoryDatabaseFixture.withFixture { fixture in
             let db = fixture.database
 
-            let result = try await resolveTagNamesFromDB(["Climate Policy"], database: db)
-            #expect(result == ["Climate Policy"])
+            let result = try await resolveTagNamesFromDB(["iOS"], database: db)
+            #expect(result == ["iOS"])
+        }
+    }
+
+    @Test("Deduplicates unmatched proposals by normalized name while keeping first display form")
+    @MainActor
+    func deduplicatesNewProposalsByNormalizedName() async throws {
+        try await InMemoryDatabaseFixture.withFixture { fixture in
+            let db = fixture.database
+
+            let result = try await resolveTagNamesFromDB(["iOS", "IOS", " iOS "], database: db)
+            #expect(result == ["iOS"])
         }
     }
 
@@ -155,9 +166,9 @@ struct TaggingExecutionTests {
             }
 
             let result = try await resolveTagNamesFromDB(["linux", "Swift", "open source"], database: db)
-            #expect(result[0] == "Linux")
+            #expect(result[0] == "linux")
             #expect(result[1] == "Swift")
-            #expect(result[2] == "Open Source")
+            #expect(result[2] == "open source")
         }
     }
 

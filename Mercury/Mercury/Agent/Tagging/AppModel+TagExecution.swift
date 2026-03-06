@@ -16,7 +16,7 @@ struct TaggingPanelRequest: Sendable {
 enum TaggingPanelEvent: Sendable {
     case started(UUID)
     case notice(String)
-    // Resolved tag names (existing canonical names or normalized new proposals).
+    // Resolved tag names (existing canonical names or preserved-display new proposals).
     case completed([String])
     case terminal(TaskTerminalOutcome)
 }

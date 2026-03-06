@@ -48,6 +48,12 @@ struct TaggingResolvedNameItem: Sendable {
     let resolvedTagID: Int64?
 }
 
+private func normalizedDisplayNamePreservingCase(_ rawName: String) -> String {
+    rawName
+        .split(whereSeparator: { $0.isWhitespace })
+        .joined(separator: " ")
+}
+
 func executeTaggingPerEntry(
     entryId: Int64,
     title: String,
@@ -293,8 +299,8 @@ func resolveTagNamesDetailedFromDB(
     var resolvedExistingTagIDs: [Int64] = []
     var newProposals: [String] = []
     var resolvedItems: [TaggingResolvedNameItem] = []
-    var seenDisplay: Set<String> = []
     var seenNormalized: Set<String> = []
+    var seenDisplay: Set<String> = []
 
     for rawName in rawNames {
         let normalized = TagNormalization.normalize(rawName)
@@ -342,24 +348,18 @@ func resolveTagNamesDetailedFromDB(
             continue
         }
 
-        let titleCased = normalized
-            .split(separator: " ")
-            .map { $0.prefix(1).uppercased() + $0.dropFirst() }
-            .joined(separator: " ")
+        let preservedDisplayName = normalizedDisplayNamePreservingCase(rawName)
+        guard seenNormalized.insert(normalized).inserted else { continue }
 
-        if seenDisplay.insert(titleCased).inserted {
-            resolvedDisplayNames.append(titleCased)
+        normalizedNames.append(normalized)
+        if seenDisplay.insert(preservedDisplayName).inserted {
+            resolvedDisplayNames.append(preservedDisplayName)
         }
-        if seenNormalized.insert(normalized).inserted {
-            normalizedNames.append(normalized)
-        }
-        if newProposals.contains(titleCased) == false {
-            newProposals.append(titleCased)
-        }
+        newProposals.append(preservedDisplayName)
         resolvedItems.append(
             TaggingResolvedNameItem(
                 normalizedName: normalized,
-                displayName: titleCased,
+                displayName: preservedDisplayName,
                 resolvedTagID: nil
             )
         )

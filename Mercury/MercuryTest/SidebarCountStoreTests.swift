@@ -165,22 +165,22 @@ struct SidebarCountStoreTests {
         }
     }
 
-    // MARK: - Visibility policy
+    // MARK: - Tag visibility
 
-    @Test("Visibility policy hides provisional tags when total exceeds threshold")
+    @Test("Sidebar projection keeps provisional tags even when tag count is large")
     @MainActor
-    func visibilityPolicyHidesProvisionalTagsAboveThreshold() async throws {
+    func projectionKeepsAllTagsWhenTagCountIsLarge() async throws {
         try await InMemoryDatabaseFixture.withFixture { fixture in
             let manager = fixture.database
 
-            let tagCount = SidebarTagVisibilityPolicy.provisionalHiddenThreshold + 1
+            let tagCount = 64
             for i in 0..<tagCount {
                 try await manager.write { db in
                     var tag = Tag(
                         id: nil,
-                        name: "ProvisionalTag\(i)",
-                        normalizedName: "provisionaltag\(i)",
-                        isProvisional: true,
+                        name: i.isMultiple(of: 2) ? "CanonicalTag\(i)" : "ProvisionalTag\(i)",
+                        normalizedName: i.isMultiple(of: 2) ? "canonicaltag\(i)" : "provisionaltag\(i)",
+                        isProvisional: i.isMultiple(of: 2) == false,
                         usageCount: 0
                     )
                     try tag.insert(db)
@@ -189,47 +189,16 @@ struct SidebarCountStoreTests {
 
             let store = SidebarCountStore(database: manager)
             defer { store.stopObservation() }
-
-            try await waitUntil { store.projection.tags.isEmpty }
-
-            try await manager.write { db in
-                _ = try Tag
-                    .filter(Column("normalizedName") == "provisionaltag0")
-                    .updateAll(db, Column("isProvisional").set(to: false))
-            }
 
             try await waitUntil {
-                store.projection.tags.count == 1
-                    && store.projection.tags.first?.normalizedName == "provisionaltag0"
-            }
-        }
-    }
-
-    @Test("Visibility policy shows all tags when total is at or below threshold")
-    @MainActor
-    func visibilityPolicyShowsAllTagsAtOrBelowThreshold() async throws {
-        try await InMemoryDatabaseFixture.withFixture { fixture in
-            let manager = fixture.database
-
-            let tagCount = SidebarTagVisibilityPolicy.provisionalHiddenThreshold
-            for i in 0..<tagCount {
-                try await manager.write { db in
-                    var tag = Tag(
-                        id: nil,
-                        name: "Tag\(i)",
-                        normalizedName: "tag\(i)",
-                        isProvisional: true,
-                        usageCount: 0
-                    )
-                    try tag.insert(db)
-                }
+                store.projection.tags.count == tagCount
             }
 
-            let store = SidebarCountStore(database: manager)
-            defer { store.stopObservation() }
-
-            try await waitUntil { store.projection.tags.count == tagCount }
-            #expect(store.projection.tags.allSatisfy { $0.isProvisional == true })
+            let normalizedNames = Set(store.projection.tags.map(\.normalizedName))
+            #expect(normalizedNames.contains("canonicaltag0"))
+            #expect(normalizedNames.contains("provisionaltag1"))
+            #expect(store.projection.tags.contains(where: { $0.isProvisional }))
+            #expect(store.projection.tags.contains(where: { $0.isProvisional == false }))
         }
     }
 

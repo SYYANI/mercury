@@ -46,14 +46,14 @@ struct TagAliasBypassTests {
         }
     }
 
-    @Test("Unrecognized LLM output names remain as new proposals")
+    @Test("Unrecognized LLM output names remain as new proposals with original display casing")
     @MainActor
     func keepsUnrecognizedOutputsAsProposals() async throws {
         try await InMemoryDatabaseFixture.withFixture { fixture in
             let db = fixture.database
 
             let result = try await resolveTagNamesFromDB(["Edge AI", "RAG Ops"], database: db)
-            #expect(result == ["Edge Ai", "Rag Ops"])
+            #expect(result == ["Edge AI", "RAG Ops"])
         }
     }
 }

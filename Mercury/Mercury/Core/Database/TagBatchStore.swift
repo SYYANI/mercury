@@ -359,18 +359,28 @@ final class TagBatchStore {
                     updatedAt
                 )
                 SELECT
-                    runId,
-                    normalizedName,
-                    displayName,
-                    COUNT(*) AS hitCount,
-                    COUNT(DISTINCT entryId) AS sampleEntryCount,
+                                        grouped.runId,
+                                        grouped.normalizedName,
+                                        representative.displayName,
+                                        grouped.hitCount,
+                                        grouped.sampleEntryCount,
                     ?,
                     ?,
                     ?
-                FROM tag_batch_assignment_staging
-                WHERE runId = ?
-                  AND assignmentKind = ?
-                GROUP BY runId, normalizedName, displayName
+                                FROM (
+                                        SELECT
+                                                runId,
+                                                normalizedName,
+                                                COUNT(*) AS hitCount,
+                                                COUNT(DISTINCT entryId) AS sampleEntryCount,
+                                                MIN(id) AS representativeAssignmentId
+                                        FROM tag_batch_assignment_staging
+                                        WHERE runId = ?
+                                            AND assignmentKind = ?
+                                        GROUP BY runId, normalizedName
+                                ) grouped
+                                JOIN tag_batch_assignment_staging representative
+                                    ON representative.id = grouped.representativeAssignmentId
                 """,
                 arguments: [
                     TagBatchReviewDecision.pending.rawValue,
