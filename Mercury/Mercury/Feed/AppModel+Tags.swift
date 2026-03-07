@@ -30,8 +30,7 @@ extension AppModel {
     /// Deletes a tag and removes it from all articles.
     func deleteTag(id: Int64) async {
         do {
-            try await entryStore.deleteTag(id: id)
-            tagMutationVersion += 1
+            try await deleteTagLibraryTag(id: id)
         } catch TagMutationError.batchRunActive {
             // Destructive mutation is blocked while batch tagging is active.
         } catch {
