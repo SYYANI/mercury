@@ -137,7 +137,7 @@ Display:
 Actions:
 - row-level `Keep` / `Discard`,
 - bulk actions (`Keep All`, `Discard All`) placed in footer left of primary action,
-- primary action `Apply Decisions` in footer right,
+- primary action `Apply` in footer right,
 - `Abort` in footer left (destructive lifecycle action).
 
 Matched existing tags are not reviewed one-by-one.
@@ -197,7 +197,7 @@ When stage is `Running`, `ReadyNext`, `Review`, or `Applying`:
   - `Close` for non-active states,
   - `Abort` for active lifecycle states.
 - Right side uses positive/forward semantics with one primary default button:
-  - `Start`, `Review`, `Apply`, `Apply Decisions`.
+  - `Start`, `Review`, `Apply`.
 - Branch/support actions are placed immediately left of the primary button:
   - e.g. `Reset to Default`, `Keep All`, `Discard All`, `Stop`.
 - Keyboard behavior:

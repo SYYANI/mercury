@@ -185,7 +185,7 @@ struct BatchTaggingSheetView: View {
 
                 if viewModel.exceedsWarningThreshold {
                     Text(
-                        "Large target size detected. This batch may consume many tokens and take longer to finish. Paid providers may incur significant cost. Start will ask for confirmation.",
+                        "Large target size detected. Please confirm scope and settings before starting. This batch may consume a large amount of tokens and take considerable time. If a paid provider is used, costs may be significant.",
                         bundle: bundle
                     )
                     .font(.footnote)
@@ -395,7 +395,7 @@ struct BatchTaggingSheetView: View {
                 Button {
                     Task { await viewModel.applyDecisions() }
                 } label: {
-                    Text("Apply Decisions", bundle: bundle)
+                    Text("Apply", bundle: bundle)
                 }
                 .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.defaultAction)

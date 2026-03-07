@@ -522,7 +522,7 @@ nonisolated enum AgentRuntimeProjection {
         case .hardSafetyCapExceeded(let limit):
             return batchFooterProjectedMessage(
                 text: String(
-                    localized: "Estimated batch entries exceed hard safety limit (\(limit)). To reduce run risk, please narrow the scope.",
+                    localized: "Estimated batch entries exceed hard safety limit (\(limit)). To control run risk, please narrow the selection scope.",
                     bundle: bundle
                 ),
                 severity: .error
