@@ -2635,6 +2635,12 @@
         }
       }
     },
+    "Rename was not applied." : {
+
+    },
+    "Rename..." : {
+
+    },
     "Rename…" : {
       "localizations" : {
         "zh-Hans" : {
@@ -3301,6 +3307,9 @@
           }
         }
       }
+    },
+    "Tag renamed." : {
+
     },
     "Tag System" : {
       "localizations" : {

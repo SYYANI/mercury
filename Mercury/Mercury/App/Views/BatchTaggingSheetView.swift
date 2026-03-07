@@ -330,7 +330,8 @@ struct BatchTaggingSheetView: View {
                 AgentBatchSheetFooterMessageView(
                     message: footerMessage,
                     onPrimaryAction: nil,
-                    onSecondaryAction: nil
+                    onSecondaryAction: nil,
+                    onDismiss: nil
                 )
                 .frame(maxWidth: footerMessageAvailableWidth)
                 .allowsHitTesting(false)

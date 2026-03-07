@@ -89,7 +89,10 @@ struct SidebarView<StatusView: View>: View {
         }
         .frame(minWidth: 220)
         .sheet(item: $tagPendingRename) { tag in
-            TagRenameSheet(tag: tag) { newName in
+            TagRenameSheetView(
+                title: String(localized: "Rename Tag", bundle: bundle),
+                initialName: tag.name
+            ) { newName in
                 onRenameTag(tag, newName)
             }
         }
@@ -348,57 +351,6 @@ private struct VirtualFeedRow: Identifiable {
     let iconSystemName: String
 
     var id: FeedSelection { selection }
-}
-
-// MARK: - Tag rename sheet
-
-/// A small sheet presented when the user chooses Rename from the tag context menu.
-/// Implemented as a separate view so its `@State` is freshly initialized on every
-/// presentation, bypassing the macOS NSAlert/NSTextField view-reuse bug where the
-/// text field shows stale content on repeated opens of the same tag.
-private struct TagRenameSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.localizationBundle) private var bundle
-
-    let tag: SidebarTagItem
-    let onCommit: (String) -> Void
-
-    @State private var text: String = ""
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Rename Tag", bundle: bundle)
-                .font(.headline)
-
-            TextField(String(localized: "Tag name", bundle: bundle), text: $text)
-                .textFieldStyle(.roundedBorder)
-                .frame(minWidth: 260)
-                .onSubmit { commit() }
-
-            HStack {
-                Spacer()
-                Button(String(localized: "Cancel", bundle: bundle), role: .cancel) {
-                    dismiss()
-                }
-                .keyboardShortcut(.cancelAction)
-
-                Button(String(localized: "Rename", bundle: bundle)) {
-                    commit()
-                }
-                .keyboardShortcut(.defaultAction)
-                .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
-        }
-        .padding(20)
-        .onAppear { text = tag.name }
-    }
-
-    private func commit() {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.isEmpty == false else { dismiss(); return }
-        onCommit(trimmed)
-        dismiss()
-    }
 }
 
 private struct SidebarFeedRow: View {

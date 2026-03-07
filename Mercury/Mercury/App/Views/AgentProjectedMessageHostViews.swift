@@ -80,6 +80,7 @@ struct AgentBatchSheetFooterMessageView: View {
     let message: AgentHostRenderedMessageModel
     let onPrimaryAction: (() -> Void)?
     let onSecondaryAction: (() -> Void)?
+    let onDismiss: (() -> Void)?
 
     var body: some View {
         HStack(spacing: 8) {
@@ -115,6 +116,13 @@ struct AgentBatchSheetFooterMessageView: View {
                 Button(primaryActionLabel, action: onPrimaryAction)
                     .buttonStyle(.link)
                     .font(.footnote)
+            }
+            if let onDismiss {
+                Button(action: onDismiss) {
+                    Image(systemName: "xmark")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
             }
         }
         .frame(maxWidth: .infinity, alignment: .center)

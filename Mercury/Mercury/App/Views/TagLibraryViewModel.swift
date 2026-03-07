@@ -11,6 +11,27 @@ struct TagLibrarySheetMessage: Identifiable, Equatable {
     let id = UUID()
     let tone: Tone
     let text: String
+
+    var renderedModel: AgentHostRenderedMessageModel {
+        AgentHostRenderedMessageModel(
+            primaryText: text,
+            secondaryText: nil,
+            severity: severity,
+            primaryActionLabel: nil,
+            secondaryActionLabel: nil
+        )
+    }
+
+    private var severity: AgentMessageSeverity {
+        switch tone {
+        case .success:
+            .success
+        case .warning:
+            .warning
+        case .error:
+            .error
+        }
+    }
 }
 
 @MainActor
@@ -51,6 +72,10 @@ final class TagLibraryViewModel: ObservableObject {
 
     var canMergeSelectedTag: Bool {
         inspector != nil && mergeTargetItems.isEmpty == false && isMutationAllowed
+    }
+
+    var canRenameSelectedTag: Bool {
+        inspector != nil && isMutationAllowed
     }
 
     var canMakeSelectedTagPermanent: Bool {
@@ -167,6 +192,28 @@ final class TagLibraryViewModel: ObservableObject {
                 fallback: String(localized: "Failed to prepare tag merge.", bundle: bundle)
             )
             return nil
+        }
+    }
+
+    func renameSelectedTag(to newName: String) async {
+        guard let appModel, let tagID = inspector?.tagId, let previousName = inspector?.name else { return }
+
+        let trimmedNewName = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmedNewName.isEmpty == false else { return }
+
+        await appModel.renameTag(id: tagID, newName: trimmedNewName)
+        await refresh()
+
+        if inspector?.name != previousName {
+            message = TagLibrarySheetMessage(
+                tone: .success,
+                text: String(localized: "Tag renamed.", bundle: bundle)
+            )
+        } else if trimmedNewName != previousName {
+            message = TagLibrarySheetMessage(
+                tone: .warning,
+                text: String(localized: "Rename was not applied.", bundle: bundle)
+            )
         }
     }
 

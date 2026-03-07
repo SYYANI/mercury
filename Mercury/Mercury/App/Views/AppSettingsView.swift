@@ -20,7 +20,7 @@ struct AppSettingsView: View {
                     Label(String(localized: "Agents", bundle: bundle), systemImage: "sparkles")
                 }
         }
-        .frame(minWidth: 920, minHeight: 620)
+        .frame(minWidth: 920, minHeight: 640)
         .environment(\.localizationBundle, LanguageManager.shared.bundle)
     }
 }
@@ -116,17 +116,19 @@ private struct GeneralSettingsView: View {
                             .foregroundStyle(.secondary)
                     }
 
-                    Button(action: {
-                        isShowingBatchTaggingSheet = true
-                    }) {
-                        Text("Batch Tagging...", bundle: bundle)
-                    }
-                    .disabled(!appModel.isTaggingAgentAvailable || !isTaggingAgentEnabled)
+                    HStack(spacing: 12) {
+                        Button(action: {
+                            isShowingBatchTaggingSheet = true
+                        }) {
+                            Text("Batch Tagging...", bundle: bundle)
+                        }
+                        .disabled(!appModel.isTaggingAgentAvailable || !isTaggingAgentEnabled)
 
-                    Button(action: {
-                        isShowingTagLibrarySheet = true
-                    }) {
-                        Text("Tag Library...", bundle: bundle)
+                        Button(action: {
+                            isShowingTagLibrarySheet = true
+                        }) {
+                            Text("Tag Library...", bundle: bundle)
+                        }
                     }
                 }
             }

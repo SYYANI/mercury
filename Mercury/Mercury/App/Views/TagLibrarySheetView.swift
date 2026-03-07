@@ -10,6 +10,7 @@ struct TagLibrarySheetView: View {
     @State private var isDeleteUnusedConfirmPresented = false
     @State private var isMergePickerPresented = false
     @State private var isMergeConfirmPresented = false
+    @State private var isRenameSheetPresented = false
     @State private var mergePickerSearchText: String = ""
     @State private var mergeTargetSelection: Int64?
     @State private var pendingMergePreview: TagLibraryMergePreview?
@@ -26,7 +27,14 @@ struct TagLibrarySheetView: View {
             }
             if let message = viewModel.message {
                 Divider()
-                messageBar(message)
+                AgentBatchSheetFooterMessageView(
+                    message: message.renderedModel,
+                    onPrimaryAction: nil,
+                    onSecondaryAction: nil,
+                    onDismiss: { viewModel.clearMessage() }
+                )
+                .padding(.horizontal, 18)
+                .padding(.vertical, 12)
             }
         }
         .frame(minWidth: 920, minHeight: 620)
@@ -44,6 +52,17 @@ struct TagLibrarySheetView: View {
         }
         .sheet(isPresented: $isMergePickerPresented) {
             mergePickerSheet
+        }
+        .sheet(isPresented: $isRenameSheetPresented) {
+            if let initialName = viewModel.selectedTagName {
+                TagRenameSheetView(
+                    title: String(localized: "Rename Tag", bundle: bundle),
+                    initialName: initialName
+                ) { newName in
+                    Task { await viewModel.renameSelectedTag(to: newName) }
+                }
+                .environment(\.localizationBundle, bundle)
+            }
         }
         .alert(
             deleteTagAlertTitle,
@@ -313,19 +332,22 @@ struct TagLibrarySheetView: View {
                         Text("\(candidate.usageCount)")
                             .monospacedDigit()
                             .foregroundStyle(.secondary)
-                        Button {
-                            Task { await viewModel.selectTag(id: candidate.tagId) }
-                        } label: {
-                            Text("Inspect", bundle: bundle)
+                        HStack(spacing: 14) {
+                            Button {
+                                Task { await viewModel.selectTag(id: candidate.tagId) }
+                            } label: {
+                                Text("Inspect", bundle: bundle)
+                            }
+                            .buttonStyle(.borderless)
+                            Button {
+                                prepareMergeConfirmation(targetID: candidate.tagId)
+                            } label: {
+                                Text("Merge Into...", bundle: bundle)
+                            }
+                            .buttonStyle(.borderless)
+                            .disabled(viewModel.isMutationAllowed == false)
                         }
-                        .buttonStyle(.borderless)
-                        Button {
-                            openMergePicker(prefillTargetID: candidate.tagId)
-                        } label: {
-                            Text("Merge Into...", bundle: bundle)
-                        }
-                        .buttonStyle(.borderless)
-                        .disabled(viewModel.isMutationAllowed == false)
+                        .padding(.trailing, 8)
                     }
                 }
             }
@@ -337,6 +359,13 @@ struct TagLibrarySheetView: View {
     private func actionsSection(_ inspector: TagLibraryInspectorSnapshot) -> some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 10) {
+                Button {
+                    isRenameSheetPresented = true
+                } label: {
+                    Text("Rename...", bundle: bundle)
+                }
+                .disabled(viewModel.canRenameSelectedTag == false)
+
                 Button {
                     openMergePicker(prefillTargetID: nil)
                 } label: {
@@ -511,30 +540,19 @@ struct TagLibrarySheetView: View {
             .foregroundStyle(color)
     }
 
-    private func messageBar(_ message: TagLibrarySheetMessage) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: message.tone.symbolName)
-                .foregroundStyle(message.tone.color)
-            Text(message.text)
-                .font(.footnote)
-            Spacer()
-            Button {
-                viewModel.clearMessage()
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 12)
-        .background(message.tone.color.opacity(0.08))
-    }
-
     private func openMergePicker(prefillTargetID: Int64?) {
         mergePickerSearchText = ""
         mergeTargetSelection = prefillTargetID
         isMergePickerPresented = true
+    }
+
+    private func prepareMergeConfirmation(targetID: Int64) {
+        Task {
+            if let preview = await viewModel.loadMergePreview(targetID: targetID) {
+                pendingMergePreview = preview
+                isMergeConfirmPresented = true
+            }
+        }
     }
 }
 
@@ -630,30 +648,6 @@ private extension TagDuplicateCandidate.Reason {
             String(localized: "Near spelling variant", bundle: bundle)
         case .likelyNamingVariant:
             String(localized: "Likely naming variant", bundle: bundle)
-        }
-    }
-}
-
-private extension TagLibrarySheetMessage.Tone {
-    var color: Color {
-        switch self {
-        case .success:
-            .green
-        case .warning:
-            ViewSemanticStyle.warningColor
-        case .error:
-            ViewSemanticStyle.errorColor
-        }
-    }
-
-    var symbolName: String {
-        switch self {
-        case .success:
-            "checkmark.circle.fill"
-        case .warning:
-            "exclamationmark.triangle.fill"
-        case .error:
-            "xmark.octagon.fill"
         }
     }
 }
