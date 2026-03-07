@@ -34,6 +34,7 @@ private struct GeneralSettingsView: View {
     @State private var isCleaningUsageData = false
     @State private var usageDataStatusMessage: String = ""
     @State private var isShowingBatchTaggingSheet = false
+    @State private var isShowingTagLibrarySheet = false
     @AppStorage("Agent.Tagging.Enabled") private var isTaggingAgentEnabled = false
 
     var body: some View {
@@ -122,7 +123,9 @@ private struct GeneralSettingsView: View {
                     }
                     .disabled(!appModel.isTaggingAgentAvailable || !isTaggingAgentEnabled)
 
-                    Button(action: {}) {
+                    Button(action: {
+                        isShowingTagLibrarySheet = true
+                    }) {
                         Text("Tag Library...", bundle: bundle)
                     }
                 }
@@ -166,6 +169,11 @@ private struct GeneralSettingsView: View {
                 .environmentObject(appModel)
                 .environment(\.localizationBundle, bundle)
                 .interactiveDismissDisabled(appModel.isTagBatchLifecycleActive)
+        }
+        .sheet(isPresented: $isShowingTagLibrarySheet) {
+            TagLibrarySheetView()
+                .environmentObject(appModel)
+                .environment(\.localizationBundle, bundle)
         }
     }
 
