@@ -1,9 +1,16 @@
 # Tags System v2 Technical Contracts (Blueprint)
 
 > Date: 2026-03-01 (revised 2026-03-03)
-> Status: Active
+> Status: Reference blueprint; core contracts have been implemented, with current release status tracked elsewhere
 > Audience: Developers, AI Coding Agents
 > Scope: Hard technical constraints for implementing `tags-v2.md`
+
+Use this document for architectural constraints and guardrails.
+For release-facing implementation status and delivered behavior, prefer:
+- `tags-v2-phases.md`,
+- `tags-v2-batch.md`,
+- `tags-v2-management.md`,
+- and the codebase as the final source of truth.
 
 This document defines the strict, non-negotiable coding contracts to guarantee that the Tags System integrates safely into Mercury's Swift/macOS/GRDB architecture without violating existing policies.
 

@@ -1,11 +1,11 @@
 # Tags v2 Batch Tagging Design Memo
 
 > Date: 2026-03-05
-> Status: Draft for discussion (not yet finalized)
+> Status: Implemented contract with closeout notes
 > Scope: Batch tagging subsystem only (UI + orchestration + staging persistence)
 
 This document is intentionally separate from `tags-v2.md` and `tags-v2-tech-contracts.md`.
-It captures current discussion outcomes and open decisions for the batch tagging subsystem.
+It now captures the delivered Phase 5.1 contract, remaining non-goals, and closeout notes for the batch tagging subsystem.
 
 ---
 
@@ -581,8 +581,9 @@ These two fixes are mandatory and must land first:
 ## 11. Tagging Prompt Optimization Plan (Shared by Panel + Batch)
 
 Status:
-- Planned, not implemented yet.
-- Intentionally documented now and scheduled for a later implementation pass.
+- Implemented for the shared prompt-template upgrade.
+- The delivered template remains shared by panel and batch tagging.
+- Guardrail-style post-processing remains intentionally conservative and minimal.
 
 ### 11.1 Scope and Constraints
 
@@ -651,8 +652,8 @@ Rollout strategy:
 ## 12. Phase 5 Front-Half Closeout Tasks
 
 Status:
-- Confirmed as follow-up cleanup before closing Phase 5 front-half (`batch tagging`).
-- This section is implementation-facing and records agreed technical debt cleanup, contract consolidation, and documentation/localization sync work.
+- Completed.
+- This section remains as implementation-facing closeout history for the shipped Phase 5 front-half (`batch tagging`).
 
 ### 12.1 Scope Boundary for Closeout
 

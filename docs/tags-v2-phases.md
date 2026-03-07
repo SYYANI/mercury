@@ -1,7 +1,7 @@
 # Tags System v2 Development Phases (Checklist)
 
 > Date: 2026-03-01 (revised 2026-03-03)
-> Status: Active — Phases 1–3 complete, entering Phase 4
+> Status: Release-ready — Phases 1–5 complete; Phase 6 remains optional follow-up tuning
 > Purpose: Staged execution plan & testable checklist for V2 Tags System
 
 This document breaks down the `tags-v2.md` and `tags-v2-tech-contracts.md` into actionable, testable phases. Each stage is designed to be incrementally deployable, risk-controlled, and testable without waiting for the entire system to be finished.
@@ -214,43 +214,39 @@ This document breaks down the `tags-v2.md` and `tags-v2-tech-contracts.md` into 
 ## Phase 5: Power User Tools & Polish (The Batch Queue)
 **Goal:** Complete the backend batching functionality and user-facing tag management utilities.
 
-- [ ] **5.1 Batch Tagging Queue**
-  - Entry point: "Batch Tagging..." button in General Settings > Tag System (created in Phase 4-S2). Opens a modal sheet.
-  - **Scope selection**: Fixed set — `Past Week / Past Month / Past Six Months / All Entries / All Unread`. After selection, sheet shows estimated entry count. If count exceeds `BatchTaggingPolicy.maxEntriesPerRun` (= 100), a warning is shown: "Only the most recent 100 articles will be processed. Run again to continue."
-  - **Re-run filter**: Checkbox "Skip articles already batch-tagged" (default: checked). Excludes entries with any `entry_tag` row where `source = "ai"`. Tags accepted via panel use `source = "manual"` and are never excluded.
-  - **Double-intent confirmation** (non-negotiable): user selects scope and then taps a distinct "Start" button. A single selection gesture never triggers a run.
-  - **Prompt template**: `tagging.batch.default.yaml`. Input: title + `Entry.summary` only. Max tags per article: `BatchTaggingPolicy.maxTagsPerEntry` = 3. Max new tag proposals per article (prompt guidance): `BatchTaggingPolicy.maxNewTagProposalsPerEntry` = 2. New proposals enter sign-off; they are **not** written to DB during the run.
-  - **Batch Quality Contract**:
-    - All batch-assigned tags start as `isProvisional = true`; they do not auto-promote during the run.
-    - All outputs pass through alias resolver before any DB write.
-    - Matched tags (resolve to existing DB records) are written immediately as the run progresses.
-    - New proposals (no DB match after normalization + alias resolver) are collected in `tag_batch_run.newTagNames` (JSON array) and held pending sign-off.
-  - **Sign-off flow** (required after every run that produced at least one new proposal):
-    - Sheet lists each proposed new tag name + count of articles it was assigned to.
-    - User marks each as **Keep** (tag created as `isProvisional = true`; pending `entry_tag` rows committed) or **Discard** (name and its pending rows dropped entirely).
-    - Existing tags merely re-applied to new articles need no review.
-    - A new batch run cannot start while `tag_batch_run.status = 'running'` or a sign-off is pending.
-    - If a batch run creates zero new proposals, no sign-off sheet is shown; run completes immediately.
-  - **Orchestration**: Create `AppModel+TagBatchExecution.swift` (separate from `AppModel+TagExecution.swift`). Enqueue a single outer task with `AgentTaskKind.taggingBatch` / `AppTaskKind.taggingBatch`. The outer task drives per-entry LLM calls internally with `BatchTaggingPolicy.concurrencyLimit = 3` parallel requests (via `withTaskGroup`); these do not each become a separate `AppTask`. `tag_batch_run.processedEntries` checkpointed after each entry. This background task can run concurrently with a panel tagging task (`.tagging`) without conflict.
-  - **Resume on relaunch**: Detect `tag_batch_run.status = 'running'` on app launch. Present user with choice to resume or cancel — do not auto-resume silently.
-  - **Validation**: Queue checkpoints correctly; force-quit and relaunch correctly offers resume or cancellation.
-- [ ] **5.2 Tag Management Settings Page**
-  - Create a dedicated Settings sub-page for system-level tag maintenance (supplements the lightweight per-tag right-click actions in the sidebar, which are in Phase 2.1).
-  - **Provisional tag review**: Lists all `isProvisional = true` tags with article counts. User can promote (confirm, sets `isProvisional = false`) or delete each.
-  - **Merge tool (Canonical Consolidation)**: User selects Tag A → merge into Tag B. The operation:
-    1. Re-points all `entry_tag` rows from A's `tagId` to B's `tagId` (with `INSERT OR IGNORE` to handle articles that already have both).
-    2. Adds A's `name` as a new `tag_alias` of B.
-    3. Deletes Tag A.
-    4. Recalculates `usageCount` for Tag B.
-  - **Merge suggestion queue**: Surface pairs of tags with high orthographic similarity (Levenshtein distance ≤ 2 on `normalizedName`). Presented as "Did you mean the same thing?" cards for the user to confirm-merge or dismiss.
-  - Note: Hierarchical parent-child tag relationships are explicitly out of scope for v2. Semantic grouping of related but non-equivalent tags is approximated by co-occurrence in the recommendation engine, not modeled at the data layer.
-- [ ] **5.3 End-to-End User Verification**
-  - Complete stress test: Feed parsing → User opens article → Opens tagging panel → Accepts AI suggestion → Tag appears in Sidebar → Tag filter works → Related Articles strip shows correctly → Batch tagging run processes a bounded corpus cleanly.
+- [x] **5.1 Batch Tagging Queue**
+  - Status: Implemented and closed out. The current implementation contract lives in `tags-v2-batch.md`.
+  - Entry point is `General > Tag System > Batch Tagging...`, routed to a real sheet with lifecycle-aware dismissal lock.
+  - Current scope set: `Past Week / Past Month / Past Three Months / Past Six Months / Past Twelve Months / All Unread / All Entries`.
+  - Current configure controls include both skip filters (`already applied by batch`, `already tagged`) and concurrency (`1...5`, default `3`).
+  - Prompt execution uses the shared `tagging.default.yaml` template with `bodyKind = summary`, `maxTagCount = 5`, and `maxNewTagCount = 2`.
+  - Large target handling is `warning + explicit confirmation`; a separate `absoluteSafetyCap` remains only as an engineering safeguard.
+  - Run lifecycle is fully implemented: `Configure -> Running -> ReadyNext -> Review? -> Applying -> Done`, with staging persistence, review decisions, idempotent chunked apply, and active-lifecycle mutation guards.
+  - Relaunch/resume is intentionally not part of the delivered Phase 5 contract; earlier proposal-era text implying cross-launch resume should not be treated as current behavior.
+- [x] **5.2 Tag Management Settings Page**
+  - Status: Implemented and closed out. The current implementation contract lives in `tags-v2-management.md`.
+  - `General > Tag System > Tag Library...` opens a dedicated management sheet.
+  - Delivered capabilities:
+    - searchable/filterable library list,
+    - inspector-driven rename / merge / make permanent / delete,
+    - alias add/delete,
+    - delete-unused flow,
+    - conservative potential-duplicates inspection,
+    - active-batch lifecycle mutation blocking.
+  - Lightweight sidebar tag actions remain intact and continue to serve day-to-day usage; Tag Library owns library-maintenance workflows.
+- [x] **5.3 End-to-End User Verification**
+  - Status: Release-prep validation completed through targeted regression tests plus manual app verification during implementation.
+  - Automated coverage now includes database/query contracts, panel/batch execution parsing, batch staging/apply behavior, event propagation, lifecycle guards, and Tag Library mutation semantics.
+  - Manual release smoke verification is still recommended on a real corpus, but it is no longer a blocker for considering the tag system feature-complete.
 
 ---
 
 ## Phase 6: Related Entry Recommendation Improvement
 **Goal:** Improve the quality and relevance of the "Related Content" strip at the bottom of the Reader pane. The current implementation is a simple shared-tag co-occurrence SQL query; this phase investigates higher-signal ranking approaches.
+
+Status note:
+- Deferred for this release.
+- The current co-occurrence implementation is stable and shipped; larger ranking changes are intentionally not required to close Tags v2.
 
 - [ ] **6.1 Ranking Signal Audit**
   - Audit the current `fetchRelatedEntries` SQL: document its edge-case behavior (entry with no tags always returns empty; same-feed bias; no recency weighting).

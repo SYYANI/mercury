@@ -1,8 +1,9 @@
 # Tags v2 Management Design
 
 Status:
-- Planned.
-- Covers Phase 5.2 "Tag Library" in Settings.
+- Implemented.
+- Covers delivered Phase 5.2 "Tag Library" management in Settings.
+- This document now serves as the implementation contract and design rationale for the shipped management surface.
 
 Purpose:
 - Define the dedicated Tag Library management surface that complements, rather than duplicates, the lightweight tag actions already available in the main sidebar.

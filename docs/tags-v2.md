@@ -1,8 +1,15 @@
 # Tags System v2 Proposal
 
 > Date: 2026-03-01 (revised 2026-03-02)
-> Status: Proposed (revised)
+> Status: Historical design reference; implementation delivered in code and tracked in phase-specific docs
 > Evolution from v1: Incorporates "Recommendation-first" focus, progressive AI architecture, and Local-first guarantees.
+
+For current implementation status and release-facing behavior, use:
+- `tags-v2-phases.md` for staged completion status,
+- `tags-v2-batch.md` for current batch-tagging contract,
+- `tags-v2-management.md` for current Tag Library management contract.
+
+This document remains valuable as the original design rationale, but it may retain proposal-era wording or values that have since been refined.
 
 ## 1. Core Principles and Goals
 
