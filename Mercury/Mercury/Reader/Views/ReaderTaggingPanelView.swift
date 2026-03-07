@@ -157,7 +157,7 @@ struct ReaderTaggingPanelView: View {
             }
         } else if candidates.isEmpty == false {
             suggestionChipSection(
-                title: "AI Suggested",
+                title: "Suggested",
                 items: Array(candidates).map { name in
                     SuggestionChipItem(
                         id: "ai-\(name)",
@@ -240,7 +240,7 @@ struct ReaderTaggingPanelView: View {
 
         if candidates.isEmpty == false {
             suggestionChipSection(
-                title: "From existing tags",
+                title: "Existing",
                 items: candidates
                     .prefix(TaggingPolicy.maxExistingTagChips)
                     .compactMap { tag in

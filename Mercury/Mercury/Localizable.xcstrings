@@ -272,12 +272,12 @@
         }
       }
     },
-    "AI Suggested" : {
+    "Suggested" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI 推荐"
+            "value" : "推荐标签"
           }
         }
       }
@@ -1723,12 +1723,12 @@
         }
       }
     },
-    "From existing tags" : {
+    "Existing" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "从已有标签中选择"
+            "value" : "现有标签"
           }
         }
       }
